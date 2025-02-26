@@ -103,7 +103,7 @@ class ScriptArguments:
         metadata={"help": "the key of the dataset"},
     )
     eos_ids: List[int] = field(default_factory=lambda: [], metadata={"help": "the ids of the end of sentence tokens"})
-    dataset_size: Optional[int] = field(
+    dataset_end: Optional[int] = field(
         default=100,
         metadata={"help": "the size of the dataset"},
     )
@@ -130,7 +130,7 @@ llm = LLM(
     #max_model_len=script_args.max_input_length,
     load_format="auto",
     seed=42,
-    gpu_memory_utilization=0.3
+    gpu_memory_utilization=0.35
 )
 tokenizer = AutoTokenizer.from_pretrained(model_path)
 
@@ -145,9 +145,12 @@ sampling_params = SamplingParams(
 
 
 ds = load_dataset(script_args.dataset_name_or_path, split="train")
-if script_args and script_args.dataset_size > 0:
-    script_args.dataset_size = min(script_args.dataset_size, len(ds) - script_args.dataset_start)
-    ds = ds.shuffle(seed=script_args.seed).select(range(script_args.dataset_start, script_args.dataset_start + script_args.dataset_size))
+if script_args:
+    if script_args.dataset_end > 0:
+        script_args.dataset_end = min(script_args.dataset_end, len(ds))
+    else:
+        script_args.dataset_end = len(ds)
+    ds = ds.shuffle(seed=script_args.seed).select(range(script_args.dataset_start, script_args.dataset_end))
 
 # ## loading for MATH training set
 # configs = get_dataset_config_names(script_args.dataset_name_or_path)

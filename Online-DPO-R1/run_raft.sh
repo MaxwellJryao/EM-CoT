@@ -13,7 +13,8 @@ best_of_k=8
 GPUS=(0 1 2 3 4 5 6 7)
 my_world_size=${#GPUS[@]}
 NUM_GPUS=$my_world_size
-dataset_size=50
+dataset_start=10000
+dataset_end=20000
 
 # Function to run a set of operations for a model iteration
 run_iteration() {
@@ -36,7 +37,8 @@ run_iteration() {
             --K $best_of_k \
             --temperature 1.0 \
             --local_index $i \
-            --dataset_size $dataset_size \
+            --dataset_end $dataset_end \
+            --dataset_start $dataset_start \
             --my_world_size $my_world_size &
     done
   
@@ -49,7 +51,7 @@ run_iteration() {
     python reward_labeling.py --dataset_name_or_path "${output_dir}_data.jsonl" --output_dir $model_output
 
     # Prepare the sft data for raft
-    python raft/prepare_sft_data.py --data_path $model_output
+    python raft/prepare_sft_data.py --data_path $model_output --start=$dataset_start --end=$dataset_end
    
     conda activate sft
 
@@ -65,8 +67,8 @@ do
     iteration_name="Qwen_numina_raft${i}"
     jsonl_input="dsrtrain/numia_prompt"
     # jsonl_input="EleutherAI/hendrycks_math"
-    json_output="${base_path}/${iteration_prefix}${i}_${iteration_name}"
-    model_output="${base_path}/${iteration_prefix}${i}_${iteration_name}_reward.json"
+    json_output="${base_path}/${iteration_prefix}${i}_${iteration_name}_${dataset_start}-${dataset_end}"
+    model_output="${base_path}/${iteration_prefix}${i}_${iteration_name}_reward_${dataset_start}-${dataset_end}.json"
 
     # Determine the model path: first iteration uses the initial model, subsequent iterations use the previous iteration's model
     if [ $i -eq 1 ]; then

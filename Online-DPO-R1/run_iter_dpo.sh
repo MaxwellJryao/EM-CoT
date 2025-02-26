@@ -13,7 +13,7 @@ best_of_k=8
 GPUS=(0 1 2 3 4 5 6 7)
 my_world_size=${#GPUS[@]}
 NUM_GPUS=$my_world_size
-dataset_size=100
+dataset_s=100
 
 
 # Function to run a set of operations for a model iteration
