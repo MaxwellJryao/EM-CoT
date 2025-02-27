@@ -1,14 +1,14 @@
 set -ex
-# export CUDA_VISIBLE_DEVICES=7
-PROMPT_TYPE=$1
-MODEL_NAME_OR_PATH=$2
-OUTPUT_DIR=$3
+export CUDA_VISIBLE_DEVICES=8
+PROMPT_TYPE=qwen25-math-cot
+MODEL_NAME_OR_PATH=/scratch/jiarui14/EM-CoT/Online-DPO-R1/outputs/Qwen_numina_raft1_imend_eos
+OUTPUT_DIR=../results/Qwen_numina_raft1_imend_eos_axo0.6.0
 
 SPLIT="test"
 NUM_TEST_SAMPLE=-1
 
 # English open datasets
-DATA_NAME="math500,minerva_math,olympiadbench,aime24,amc23"
+DATA_NAME="math500,aime24,amc23,minerva_math,olympiadbench"
 TOKENIZERS_PARALLELISM=false \
 python3 -u math_eval.py \
     --model_name_or_path ${MODEL_NAME_OR_PATH} \
@@ -17,7 +17,7 @@ python3 -u math_eval.py \
     --split ${SPLIT} \
     --prompt_type ${PROMPT_TYPE} \
     --num_test_sample ${NUM_TEST_SAMPLE} \
-    --max_tokens_per_call 3000 \
+    --max_tokens_per_call 4096 \
     --seed 0 \
     --temperature 0 \
     --n_sampling 1 \

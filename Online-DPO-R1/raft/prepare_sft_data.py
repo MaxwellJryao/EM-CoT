@@ -6,6 +6,7 @@ parser = argparse.ArgumentParser()
 parser.add_argument('--data_path', type=str, default='/home/jiarui/EM-CoT/Online-DPO-R1/iter_dpo_numina_rule_reward/Train1_Qwen_numina_iter1_reward.json')
 parser.add_argument('--start', type=int, default=0)
 parser.add_argument('--end', type=int, default=100)
+parser.add_argument('--iter', type=int, default=1)
 args = parser.parse_args()
 
 ds = load_dataset('json', data_files=args.data_path)['train']
@@ -26,5 +27,5 @@ for i, item in enumerate(ds):
 
 print('new_ds', len(new_ds))
 new_ds = Dataset.from_list(new_ds)
-new_ds.save_to_disk('data/raft_train')
-new_ds.push_to_hub(f'FlippyDora/raft_train_numia_prompt_{args.start}_{args.end}')
+new_ds.save_to_disk(f'data/raft_train_iter{args.iter}_{args.start}_{args.end}')
+new_ds.push_to_hub(f'FlippyDora/raft_train_numia_prompt_iter{args.iter}_{args.start}_{args.end}')

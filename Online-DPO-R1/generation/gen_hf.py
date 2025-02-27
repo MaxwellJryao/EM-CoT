@@ -111,6 +111,10 @@ class ScriptArguments:
         default=0,
         metadata={"help": "the start index of the dataset"},
     )
+    data_shuffle_seed: Optional[int] = field(
+        default=42,
+        metadata={"help": "the random seed for shuffling the dataset"},
+    )
 
 
 parser = HfArgumentParser(ScriptArguments)
@@ -130,7 +134,7 @@ llm = LLM(
     #max_model_len=script_args.max_input_length,
     load_format="auto",
     seed=42,
-    gpu_memory_utilization=0.35
+    # gpu_memory_utilization=0.35
 )
 tokenizer = AutoTokenizer.from_pretrained(model_path)
 
@@ -150,7 +154,7 @@ if script_args:
         script_args.dataset_end = min(script_args.dataset_end, len(ds))
     else:
         script_args.dataset_end = len(ds)
-    ds = ds.shuffle(seed=script_args.seed).select(range(script_args.dataset_start, script_args.dataset_end))
+    ds = ds.shuffle(seed=script_args.data_shuffle_seed).select(range(script_args.dataset_start, script_args.dataset_end))
 
 # ## loading for MATH training set
 # configs = get_dataset_config_names(script_args.dataset_name_or_path)

@@ -1603,6 +1603,14 @@ if __name__ == '__main__':
             default=1000000,
             metadata={"help": "the end index of the dataset"},
         )
+        iter: Optional[int] = field(
+            default=1,
+            metadata={"help": "the iteration number"},
+        )
+        suffix: Optional[str] = field(
+            default=None,
+            metadata={"help": "the suffix of the dataset"},
+        )
 
 
 
@@ -1633,4 +1641,7 @@ if __name__ == '__main__':
         json.dump(all_data,f,indent=4,ensure_ascii=False)
 
     new_ds = Dataset.from_list(all_data)
-    new_ds.push_to_hub(f'FlippyDora/numia_prompt_reward_{script_args.start}-{script_args.end}')
+    if script_args.suffix:
+        new_ds.push_to_hub(f'FlippyDora/numia_prompt_reward_iter{script_args.iter}_{script_args.start}-{script_args.end}_{script_args.suffix}')
+    else:
+        new_ds.push_to_hub(f'FlippyDora/numia_prompt_reward_iter{script_args.iter}_{script_args.start}-{script_args.end}')
