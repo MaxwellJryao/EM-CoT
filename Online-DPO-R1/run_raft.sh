@@ -57,7 +57,7 @@ run_iteration() {
     # python ./generation/merge_data.py --base_path ${output_dir} --output_dir "${output_dir}_data.jsonl" --num_datasets $my_world_size
     
     # Perform reward labeling
-    # python reward_labeling.py --dataset_name_or_path "${output_dir}_data.jsonl" --output_dir $model_output --iter=$iteration_num
+    # python reward_labeling.py --dataset_name_or_path "${output_dir}_data.jsonl" --output_dir $model_output --iter=$iteration_num --start=$dataset_start --end=$dataset_end
 
     # Prepare the sft data for raft
     # python raft/prepare_sft_data.py --data_path $model_output --start=$dataset_start --end=$dataset_end --iter=$iteration_num
