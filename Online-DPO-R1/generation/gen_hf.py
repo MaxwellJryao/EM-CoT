@@ -166,7 +166,10 @@ if script_args:
 ds = ds.map(
     lambda x: {
         "prompt": tokenizer.apply_chat_template(
-            [{"role":"user","content":x[script_args.dataset_key] + f' Let\'s think step by step and output the final answer within \\boxed{{}}'}], 
+            [
+                {"role": "system", "content": "Please reason step by step, and put your final answer within \\boxed{{}}."},
+                {"role": "user", "content": x[script_args.dataset_key] + f' Let\'s think step by step and output the final answer within \\boxed{{}}'}
+            ], 
             tokenize=False, add_generation_prompt=True),
         "problem": x[script_args.dataset_key],
     }

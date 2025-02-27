@@ -18,6 +18,7 @@ for i, item in enumerate(ds):
     problem = ds[i]['problem']
     # assert problem in item['prompt']
     conv = [
+        {'role': 'system', 'content': 'Please reason step by step, and put your final answer within \\boxed{{}}.'},
         {'role': 'user', 'content': problem + f' Let\'s think step by step and output the final answer within \\boxed{{}}'},
         {'role': 'assistant', 'content': item['responses'][max_idx]}
     ]
