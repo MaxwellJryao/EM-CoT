@@ -1578,7 +1578,7 @@ if __name__ == '__main__':
     from transformers import AutoTokenizer, HfArgumentParser, pipeline
     from dataclasses import dataclass, field
     from typing import Optional
-    from datasets import load_dataset
+    from datasets import load_dataset, Dataset
     from tqdm import tqdm
 
     @dataclass
@@ -1594,6 +1594,14 @@ if __name__ == '__main__':
         output_dir: Optional[str] = field(
             default="uf_split0_responses_K8_reward.json",
             metadata={"help": "the location of the output file"},
+        )
+        start: Optional[int] = field(
+            default=0,
+            metadata={"help": "the start index of the dataset"},
+        )
+        end: Optional[int] = field(
+            default=1000000,
+            metadata={"help": "the end index of the dataset"},
         )
 
 
@@ -1623,3 +1631,6 @@ if __name__ == '__main__':
         all_data.append(sample)
     with open(script_args.output_dir,"w") as f:
         json.dump(all_data,f,indent=4,ensure_ascii=False)
+
+    new_ds = Dataset.from_list(all_data)
+    new_ds.push_to_hub(f'FlippyDora/numia_prompt_reward_{script_args.start}-{script_args.end}')
