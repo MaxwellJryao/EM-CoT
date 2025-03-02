@@ -32,35 +32,35 @@ run_iteration() {
         data_shuffle_seed=$iteration_num
     fi
 
-    # conda activate vllm
-    # my_world_size=$my_world_size
-    # infer_model=$2
-    # prompt_dir=$3
-    # output_dir=$4
-    # for i in $(seq 0 $((NUM_GPUS - 1))); do
-    #     CUDA_VISIBLE_DEVICES=${GPUS[$i]} python ./generation/gen_hf.py \
-    #         --model_name_or_path $model_path \
-    #         --dataset_name_or_path $jsonl_input \
-    #         --output_dir $json_output \
-    #         --K $best_of_k \
-    #         --temperature 1.0 \
-    #         --local_index $i \
-    #         --dataset_end $dataset_end \
-    #         --dataset_start $dataset_start \
-    #         --data_shuffle_seed $iteration_num \
-    #         --my_world_size $my_world_size &
-    # done
+    conda activate vllm
+    my_world_size=$my_world_size
+    infer_model=$2
+    prompt_dir=$3
+    output_dir=$4
+    for i in $(seq 0 $((NUM_GPUS - 1))); do
+        CUDA_VISIBLE_DEVICES=${GPUS[$i]} python ./generation/gen_hf.py \
+            --model_name_or_path $model_path \
+            --dataset_name_or_path $jsonl_input \
+            --output_dir $json_output \
+            --K $best_of_k \
+            --temperature 1.0 \
+            --local_index $i \
+            --dataset_end $dataset_end \
+            --dataset_start $dataset_start \
+            --data_shuffle_seed $data_shuffle_seed \
+            --my_world_size $my_world_size &
+    done
   
-    # wait # Ensure all inference processes finish
+    wait # Ensure all inference processes finish
     
     # Merge the generated data
-    # python ./generation/merge_data.py --base_path ${output_dir} --output_dir "${output_dir}_data.jsonl" --num_datasets $my_world_size
+    python ./generation/merge_data.py --base_path ${output_dir} --output_dir "${output_dir}_data.jsonl" --num_datasets $my_world_size
     
     # Perform reward labeling
-    # python reward_labeling.py --dataset_name_or_path "${output_dir}_data.jsonl" --output_dir $model_output --iter=$iteration_num --start=$dataset_start --end=$dataset_end
+    python reward_labeling.py --dataset_name_or_path "${output_dir}_data.jsonl" --output_dir $model_output --iter=$iteration_num --start=$dataset_start --end=$dataset_end
 
     # Prepare the sft data for raft
-    # python raft/prepare_sft_data.py --data_path $model_output --start=$dataset_start --end=$dataset_end --iter=$iteration_num
+    python raft/prepare_sft_data.py --data_path $model_output --start=$dataset_start --end=$dataset_end --iter=$iteration_num
    
     conda activate sft
 
@@ -152,7 +152,7 @@ EOT
 
 
 # Main loop for iterations
-for i in {1..1}
+for i in {2..3}
 do
     suffix="orig_eos"
     if [ -z $suffix ]; then

@@ -11,9 +11,12 @@ from typing import Optional
 from vllm import LLM, SamplingParams
 from tqdm import tqdm
 import argparse
+import utils
 import sys
 sys.path.append('/scratch/jiarui14/EM-CoT/Online-DPO-R1')
 import reward_labeling
+
+os.environ['CUDA_VISIBLE_DEVICES'] = '2'
 
 @dataclass
 class ScriptArguments:
@@ -22,7 +25,7 @@ class ScriptArguments:
         metadata={"help": "Random seed"}
     )
     max_length: Optional[int] = field(
-        default=2048,
+        default=4096,
         metadata={"help": "Max length of newly generated tokens"}
     )
     model_name_or_path: Optional[str] = field(
@@ -50,7 +53,7 @@ class ScriptArguments:
         metadata={"help": "Start index"}
     )
     end: Optional[int] = field(
-        default=3,
+        default=100000,
         metadata={"help": "End index"}
     )
     stage_1_samples: Optional[int] = field(
@@ -58,83 +61,27 @@ class ScriptArguments:
         metadata={"help": "Number of samples for stage 1 per example"}
     )
     stage_2_samples: Optional[int] = field(
-        default=8,
+        default=10000,
         metadata={"help": "Number of samples for stage 2 per example"}
     )
-
-# parser = argparse.ArgumentParser()
-# parser.add_argument('--seed', type=int, default=42, help='Random seed')
-# parser.add_argument('--max_length', type=int, default=2028, help='Max length of newly generated tokens')
-# parser.add_argument('--model_name_or_path', type=str, default='Qwen/Qwen2.5-Math-7B', help='Model name or path')
-# parser.add_argument('--epochs', type=int, default=1, help='Number of epochs')
-# parser.add_argument('--alpha', type=float, default=0.5, help='Penalty weight alpha')
-# parser.add_argument('--beta', type=float, default=2.0, help='Penalty weight beta')
-# parser.add_argument('--lr', type=float, default=0.5, help='Learning rate')
-# script_args = parser.parse_args()
-
-script_args = ScriptArguments()
-
-def set_seed(seed):
-    random.seed(seed)
-    np.random.seed(seed)
-    torch.manual_seed(seed)
-    if torch.cuda.is_available():
-        torch.cuda.manual_seed_all(seed)
-
-set_seed(script_args.seed)
-
-# prepare dataset
-ds = load_dataset('HuggingFaceH4/MATH-500')['test']
-script_args.end = min(len(ds), script_args.end)
-ds = ds.select(range(script_args.start, script_args.end))
-tokenizer = AutoTokenizer.from_pretrained(script_args.model_name_or_path)
-
-# prepare model for sampling
-llm = LLM(script_args.model_name_or_path, 
-          gpu_memory_utilization=0.4,
-          dtype=torch.bfloat16)
-
-def stage_1_sampling():
-    sampling_params = SamplingParams(
-        max_tokens=script_args.max_length,
-        temperature=1.0,
-        n=script_args.stage_1_samples,
+    local_index: Optional[int] = field(
+        default=2,
+        metadata={"help": "the local index of the agent"}
     )
-    prompts = []
-    for i, item in enumerate(ds):
-        conv = [{'role': 'user', 'content': item['problem'] + f' Let\'s think step by step and output the final answer within \\boxed{{}}'}]
-        conv_chat = tokenizer.apply_chat_template(conv, tokenize=False, add_generation_prompt=True)
-        prompts.append(conv_chat)
-    outputs = llm.generate(prompts, sampling_params)
-    return outputs
 
-stage_1_outputs = stage_1_sampling()
+# script_args = ScriptArguments()
+parser = HfArgumentParser(ScriptArguments)
+script_args = parser.parse_args_into_dataclasses()[0]
 
-#TODO: currently, stage 1 selects all outputs with correct answers
-stage_1_collected_data = []
-corrects = []
-for i, item in enumerate(ds):
-    collected_data = {
-        'problem': item['problem'],
-        'answer': item['answer'],
-        'outputs': []
-    }
-    problem_corrects = []
-    for j in range(script_args.stage_1_samples):
-        # correct = reward_labeling.is_equal(outputs[i].outputs[j].text, item['answer'], dataset_name='math500')
-        correct = reward_labeling.is_equal(stage_1_outputs[i].outputs[j].text, item['answer'], dataset_name='math500')
-        if correct:
-            problem_corrects.append(j)
-            # collected_data['outputs'].append(outputs[i].outputs[j].text)
-            collected_data['outputs'].append(stage_1_outputs[i].outputs[j].text)
-    corrects.append(problem_corrects)
-    stage_1_collected_data.append(collected_data)
+utils.set_seed(script_args.seed)
 
-print(corrects)
-stage_1_collected_data_ds = Dataset.from_list(stage_1_collected_data)
-stage_1_collected_data_ds.save_to_disk('data/stage_1_collected_data')
+# stage_1_collected_data = load_from_disk('data/stage_1_collected_data')
+with open(f'/scratch/jiarui14/EM-CoT/EM-CoT/data/stage_1_collected_data_{script_args.local_index}.json', 'r') as f:
+    stage_1_collected_data = json.load(f)
 
-# calculate the accept rate from stage 1
+script_args.end = min(script_args.end, len(stage_1_collected_data))
+stage_1_collected_data = stage_1_collected_data[script_args.start:script_args.end]
+tokenizer = AutoTokenizer.from_pretrained(script_args.model_name_or_path)
 
 def calc_accept_rate():
     accept_rates = []
@@ -174,17 +121,26 @@ def find_prompt_end(input_ids):
     
 # load model for gradient calculation
 model = AutoModelForCausalLM.from_pretrained(script_args.model_name_or_path, torch_dtype=torch.bfloat16)
+#TODO: currently only use the gradients of lm_head for gradient calculation
+for n, p in model.named_parameters():
+    if 'lm_head' not in n:
+        p.requires_grad = False
+params = [p for p in model.parameters() if p.requires_grad]
 # model.to(torch.device('cuda:8'))
 model.cuda()
 
 def calc_grad():
     all_grads = []
     for i, item in enumerate(tqdm(stage_1_collected_data, desc='Calculating gradients')):
+        if i != 1030:
+            continue
         if len(item['outputs']) == 0:
             mean_grad = 0
         else:
             grads = []
-            for output in item['outputs']:
+            for j, output in enumerate(item['outputs']):
+                if j != 4:
+                    continue
                 conv = [
                     {'role': 'system', 'content': 'Please reason step by step, and put your final answer within \\boxed{{}}.'},
                     {'role': 'user', 'content': item['problem'] + f' Let\'s think step by step and output the final answer within \\boxed{{}}'}
@@ -201,10 +157,13 @@ def calc_grad():
                 
                 # get the gradient by loss backpropagation
                 loss = -output_log_probs_sen.mean() / (len(input_ids[0]) - resp_start)
-                loss.backward()
-                grad_norm = torch.norm(model.lm_head.weight.grad, p=2).item()
+                # loss.backward()
+                # grad_norm = torch.norm(model.lm_head.weight.grad, p=2).item()
+                gradients = torch.autograd.grad(loss, params, create_graph=False, retain_graph=False)[0]
+                grad_norm = torch.norm(gradients, p=2).item()
                 grads.append(grad_norm)
                 model.zero_grad()
+                torch.cuda.empty_cache()
 
             mean_grad = np.mean(grads)
         all_grads.append(mean_grad)
@@ -214,7 +173,14 @@ def calc_grad():
 # calculate accept rates and sample sizes
 all_grads = calc_grad()
 accept_rates = calc_accept_rate()
+
+with open(f'data/accept_rates_{script_args.local_index}.json', 'w') as f:
+    json.dump(accept_rates, f, indent=4)
+
 sample_sizes = calc_sample_ratio(all_grads, accept_rates)
+
+with open(f'data/sample_sizes_ratio_{script_args.local_index}.json', 'w') as f:
+    json.dump(sample_sizes, f, indent=4)
 
 def float_to_int_preserve_sum(arr, N):
     # 1. 初步缩放并四舍五入
@@ -237,51 +203,8 @@ def float_to_int_preserve_sum(arr, N):
 
 sample_sizes = float_to_int_preserve_sum(sample_sizes, script_args.stage_2_samples)
 
-print('Sample sizes:', sample_sizes)
+with open(f'data/sample_sizes_{script_args.local_index}.json', 'w') as f:
+    json.dump(sample_sizes, f, indent=4)
 
-def stage_2_sampling(sample_sizes):
-    sampling_params = SamplingParams(
-        max_tokens=script_args.max_length,
-        temperature=1.0,
-        n=1,
-    )
-    prompts = []
-    for i, item in enumerate(ds):
-        conv = [{'role': 'user', 'content': item['problem'] + f' Let\'s think step by step and output the final answer within \\boxed{{}}'}]
-        conv_chat = tokenizer.apply_chat_template(conv, tokenize=False, add_generation_prompt=True)
-        for _ in sample_sizes[i]:
-            prompts.append(conv_chat)
-    outputs = llm.generate(prompts, sampling_params)
-
-    idx_sum = 0
-    new_outputs = []
-    for i in range(len(sample_sizes)):
-        new_outputs.append([])
-        for idx in range(idx_sum, idx_sum + sample_sizes[i]):
-            new_outputs[-1].append(outputs[idx].outputs[0].text)
-
-        idx_sum += sample_sizes[i]
-
-    return outputs
-
-stage_2_outputs = stage_2_sampling(sample_sizes)
-stage_2_collected_data = []
-corrects_2 = []
-for i, item in enumerate(ds):
-    collected_data = {
-        'problem': item['problem'],
-        'answer': item['answer'],
-        'outputs': []
-    }
-    problem_corrects = []
-    for j in range(len(stage_2_outputs[i])):
-        # correct = reward_labeling.is_equal(outputs[i].outputs[j].text, item['answer'], dataset_name='math500')
-        correct = reward_labeling.is_equal(stage_2_outputs[i][j], item['answer'], dataset_name='math500')
-        if correct:
-            problem_corrects.append(j)
-            # collected_data['outputs'].append(outputs[i].outputs[j].text)
-            collected_data['outputs'].append(stage_2_outputs[i][j])
-    corrects_2.append(problem_corrects)
-    stage_2_collected_data.append(collected_data)
-
+# print('Sample sizes:', sample_sizes)
 print('done!')
