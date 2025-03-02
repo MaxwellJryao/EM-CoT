@@ -16,7 +16,7 @@ import sys
 sys.path.append('/scratch/jiarui14/EM-CoT/Online-DPO-R1')
 import reward_labeling
 
-os.environ['CUDA_VISIBLE_DEVICES'] = '2'
+# os.environ['CUDA_VISIBLE_DEVICES'] = '2'
 
 @dataclass
 class ScriptArguments:
@@ -132,15 +132,11 @@ model.cuda()
 def calc_grad():
     all_grads = []
     for i, item in enumerate(tqdm(stage_1_collected_data, desc='Calculating gradients')):
-        if i != 1030:
-            continue
         if len(item['outputs']) == 0:
             mean_grad = 0
         else:
             grads = []
             for j, output in enumerate(item['outputs']):
-                if j != 4:
-                    continue
                 conv = [
                     {'role': 'system', 'content': 'Please reason step by step, and put your final answer within \\boxed{{}}.'},
                     {'role': 'user', 'content': item['problem'] + f' Let\'s think step by step and output the final answer within \\boxed{{}}'}
