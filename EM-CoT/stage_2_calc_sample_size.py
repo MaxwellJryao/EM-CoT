@@ -16,7 +16,7 @@ import sys
 sys.path.append('/scratch/jiarui14/EM-CoT/Online-DPO-R1')
 import reward_labeling
 
-# os.environ['CUDA_VISIBLE_DEVICES'] = '2'
+# os.environ['CUDA_VISIBLE_DEVICES'] = '3'
 
 @dataclass
 class ScriptArguments:
@@ -65,7 +65,7 @@ class ScriptArguments:
         metadata={"help": "Number of samples for stage 2 per example"}
     )
     local_index: Optional[int] = field(
-        default=2,
+        default=3,
         metadata={"help": "the local index of the agent"}
     )
 
@@ -117,7 +117,8 @@ def find_prompt_end(input_ids):
         if found:
             return i + end_len
     
-    raise ValueError('End not found')
+    # raise ValueError('End not found')
+    return -1
     
 # load model for gradient calculation
 model = AutoModelForCausalLM.from_pretrained(script_args.model_name_or_path, torch_dtype=torch.bfloat16)
@@ -131,7 +132,7 @@ model.cuda()
 
 def calc_grad():
     all_grads = []
-    for i, item in enumerate(tqdm(stage_1_collected_data, desc='Calculating gradients')):
+    for i, item in enumerate(tqdm(stage_1_collected_data, desc='Calculating gradients, index {}'.format(script_args.local_index))):
         if len(item['outputs']) == 0:
             mean_grad = 0
         else:
@@ -148,15 +149,18 @@ def calc_grad():
                 logits = o.logits
                 log_probs = nn.functional.log_softmax(logits, dim=-1)
                 resp_start = find_prompt_end(input_ids[0].tolist())
-                output_log_probs = log_probs[0, resp_start:]
-                output_log_probs_sen = output_log_probs.sum(dim=0)
-                
-                # get the gradient by loss backpropagation
-                loss = -output_log_probs_sen.mean() / (len(input_ids[0]) - resp_start)
-                # loss.backward()
-                # grad_norm = torch.norm(model.lm_head.weight.grad, p=2).item()
-                gradients = torch.autograd.grad(loss, params, create_graph=False, retain_graph=False)[0]
-                grad_norm = torch.norm(gradients, p=2).item()
+                if resp_start == -1:
+                    grad_norm = 0
+                else:
+                    output_log_probs = log_probs[0, resp_start:]
+                    output_log_probs_sen = output_log_probs.sum(dim=0)
+                    
+                    # get the gradient by loss backpropagation
+                    loss = -output_log_probs_sen.mean() / (len(input_ids[0]) - resp_start)
+                    # loss.backward()
+                    # grad_norm = torch.norm(model.lm_head.weight.grad, p=2).item()
+                    gradients = torch.autograd.grad(loss, params, create_graph=False, retain_graph=False)[0]
+                    grad_norm = torch.norm(gradients, p=2).item()
                 grads.append(grad_norm)
                 model.zero_grad()
                 torch.cuda.empty_cache()
