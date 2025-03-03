@@ -78,6 +78,10 @@ class ScriptArguments:
         default=8,
         metadata={"help": "the total number of the agents"},
     )
+    iter: Optional[int] = field(
+        default=1,
+        metadata={"help": "the iteration number"},
+    )
 
 # script_args = ScriptArguments()
 parser = HfArgumentParser(ScriptArguments)
@@ -152,8 +156,8 @@ for i, item in enumerate(ds):
 # print(corrects)
 # stage_1_collected_data_ds = Dataset.from_list(stage_1_collected_data)
 # stage_1_collected_data_ds.save_to_disk(f'data/stage_1_collected_data_{script_args.local_index}')
-with open(f'data/stage_1_collected_data_{script_args.local_index}.json', 'w', encoding='utf-8') as f:
+with open(f'data/data_{script_args.iter}/stage_1_collected_data_{script_args.local_index}.json', 'w', encoding='utf-8') as f:
     json.dump(stage_1_collected_data, f, indent=4, ensure_ascii=False)
 
-with open(f'data/stage_1_collected_data_all_{script_args.local_index}.json', 'w', encoding='utf-8') as f:
+with open(f'data/data_{script_args.iter}/stage_1_collected_data_all_{script_args.local_index}.json', 'w', encoding='utf-8') as f:
     json.dump(stage_1_collected_data_all, f, indent=4, ensure_ascii=False)
