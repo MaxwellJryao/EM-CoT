@@ -82,6 +82,10 @@ class ScriptArguments:
         default=1,
         metadata={"help": "the iteration number"},
     )
+    correct_threshold: Optional[float] = field(
+        default=-1.0,
+        metadata={"help": "the correct threshold"},
+    )
 
 # script_args = ScriptArguments()
 parser = HfArgumentParser(ScriptArguments)
@@ -127,7 +131,7 @@ stage_1_outputs = stage_1_sampling()
 stage_1_collected_data = []
 stage_1_collected_data_all = []
 corrects = []
-for i, item in enumerate(ds):
+for i, item in enumerate(tqdm(ds, desc='Collecting data stage 1, index {}'.format(script_args.local_index))):
     collected_data = {
         'problem': item['problem'],
         'answer': item['answer'],
@@ -143,7 +147,7 @@ for i, item in enumerate(ds):
     for j in range(script_args.stage_1_samples):
         # correct = reward_labeling.is_equal(outputs[i].outputs[j].text, item['answer'], dataset_name='math500')
         # correct = reward_labeling.is_equal(stage_1_outputs[i].outputs[j].text, item['answer'], dataset_name='math500')
-        correct = utils.check_correct(stage_1_outputs[i].outputs[j].text, item['answer'], i)
+        correct = utils.check_correct(stage_1_outputs[i].outputs[j].text, item['answer'], i, threshold=script_args.correct_threshold)
         if correct:
             problem_corrects.append(j)
             # collected_data['outputs'].append(outputs[i].outputs[j].text)
