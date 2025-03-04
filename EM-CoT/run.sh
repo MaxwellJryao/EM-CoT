@@ -3,8 +3,10 @@ source ~/.bashrc
 # Initialize Conda environment
 eval "$(conda shell.bash hook)"
 
+export TOKENIZERS_PARALLELISM=false
+
 initial_model="Qwen/Qwen2.5-Math-7B"
-GPUS=(0 1 2 3 4 5 6 7)
+GPUS=(1 2 3 4 5 6 7 9)
 my_world_size=${#GPUS[@]}
 
 run_iteration() {
@@ -120,7 +122,7 @@ EOT
         --deepspeed configs/deepspeed_stage3.json
 }
 
-for i in {1..3}
+for i in {2..2}
 do
     mkdir -p data/data_${i}
 

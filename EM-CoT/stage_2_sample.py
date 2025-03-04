@@ -25,7 +25,7 @@ class ScriptArguments:
         metadata={"help": "Random seed"}
     )
     max_length: Optional[int] = field(
-        default=2048,
+        default=4096,
         metadata={"help": "Max length of newly generated tokens"}
     )
     model_name_or_path: Optional[str] = field(
@@ -65,11 +65,11 @@ class ScriptArguments:
         metadata={"help": "Number of samples for stage 2 per example"}
     )
     local_index: Optional[int] = field(
-        default=3,
+        default=1,
         metadata={"help": "the local index of the agent"}
     )
     iter: Optional[int] = field(
-        default=1,
+        default=2,
         metadata={"help": "the iteration of the experiment"}
     )
 
@@ -130,12 +130,17 @@ def stage_2_sampling_flat(sample_sizes):
     return new_outputs
 
 def stage_2_sampling_max(sample_sizes):
+    if script_args.stage_1_samples >= max_sample_size:
+        return [[] for _ in range(len(sample_sizes))], [[] for _ in range(len(sample_sizes))]
+    
     new_outputs = []
     prompts = []
+
     sampling_params = SamplingParams(
         max_tokens=script_args.max_length,
         temperature=1.0,
-        n=max_sample_size,
+        # n=max_sample_size,
+        n=max_sample_size-script_args.stage_1_samples,
         # n=8,
     )
 
@@ -146,7 +151,7 @@ def stage_2_sampling_max(sample_sizes):
     
     outputs = llm.generate(prompts, sampling_params)
     for i in range(len(sample_sizes)):
-        new_outputs.append([outputs[i].outputs[j].text for j in range(sample_sizes[i])])
+        new_outputs.append([outputs[i].outputs[j].text for j in range(sample_sizes[i]-script_args.stage_1_samples)])
     all_outputs = [[output.text for output in outputs[i].outputs] for i in range(len(outputs))]
 
     return new_outputs, all_outputs
@@ -177,12 +182,18 @@ stage_2_outputs, all_outputs = stage_2_sampling_max(sample_sizes)
 with open(f'data/data_{script_args.iter}/stage_2_allOutputs_{script_args.local_index}.json', 'w', encoding='utf-8') as f:
     json.dump(all_outputs, f, indent=4, ensure_ascii=False)
 
-# with open(f'data/stage_2_allOutputs_{script_args.local_index}.json', 'r', encoding='utf-8') as f:
+# with open(f'data/data_{script_args.iter}/stage_2_allOutputs_{script_args.local_index}.json', 'r', encoding='utf-8') as f:
 #     all_outputs = json.load(f)
 # stage_2_outputs = []
 # for i in range(len(sample_sizes)):
 #     stage_2_outputs.append([all_outputs[i][j] for j in range(sample_sizes[i])])
 
+with open(f'data/data_{script_args.iter}/stage_1_collected_data_all_{script_args.local_index}.json', 'r') as f:
+    stage_1_collected_data_all = json.load(f)
+
+for i in range(len(stage_2_outputs)):
+    stage_2_outputs[i].extend(stage_1_collected_data_all[i]['outputs'])
+    all_outputs[i].extend(stage_1_collected_data_all[i]['outputs'])
 
 stage_2_collected_data = []
 corrects_2 = []
