@@ -131,13 +131,22 @@ stage_1_outputs = stage_1_sampling()
 stage_1_collected_data = []
 stage_1_collected_data_all = []
 corrects = []
+
 for i, item in enumerate(tqdm(ds, desc='Collecting data stage 1, index {}'.format(script_args.local_index))):
-    collected_data = {
+    collected_data_all = {
         'problem': item['problem'],
         'answer': item['answer'],
         'outputs': []
     }
-    collected_data_all = {
+    for j in range(script_args.stage_1_samples):
+        collected_data_all['outputs'].append(stage_1_outputs[i].outputs[j].text)
+    stage_1_collected_data_all.append(collected_data_all)
+
+with open(f'data/data_{script_args.iter}/stage_1_collected_data_all_{script_args.local_index}.json', 'w', encoding='utf-8') as f:
+    json.dump(stage_1_collected_data_all, f, indent=4, ensure_ascii=False)
+
+for i, item in enumerate(tqdm(ds, desc='Collecting data stage 1, index {}'.format(script_args.local_index))):
+    collected_data = {
         'problem': item['problem'],
         'answer': item['answer'],
         'outputs': []
@@ -152,16 +161,11 @@ for i, item in enumerate(tqdm(ds, desc='Collecting data stage 1, index {}'.forma
             problem_corrects.append(j)
             # collected_data['outputs'].append(outputs[i].outputs[j].text)
             collected_data['outputs'].append(stage_1_outputs[i].outputs[j].text)
-        collected_data_all['outputs'].append(stage_1_outputs[i].outputs[j].text)
     corrects.append(problem_corrects)
     stage_1_collected_data.append(collected_data)
-    stage_1_collected_data_all.append(collected_data_all)
 
 # print(corrects)
 # stage_1_collected_data_ds = Dataset.from_list(stage_1_collected_data)
 # stage_1_collected_data_ds.save_to_disk(f'data/stage_1_collected_data_{script_args.local_index}')
 with open(f'data/data_{script_args.iter}/stage_1_collected_data_{script_args.local_index}.json', 'w', encoding='utf-8') as f:
     json.dump(stage_1_collected_data, f, indent=4, ensure_ascii=False)
-
-with open(f'data/data_{script_args.iter}/stage_1_collected_data_all_{script_args.local_index}.json', 'w', encoding='utf-8') as f:
-    json.dump(stage_1_collected_data_all, f, indent=4, ensure_ascii=False)
