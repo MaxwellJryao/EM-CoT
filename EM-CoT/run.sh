@@ -6,7 +6,7 @@ eval "$(conda shell.bash hook)"
 export TOKENIZERS_PARALLELISM=false
 
 initial_model="Qwen/Qwen2.5-Math-7B"
-GPUS=(1 2 3 5 6 7 8 9)
+GPUS=(6 7 8 9)
 my_world_size=${#GPUS[@]}
 
 run_iteration() {
@@ -60,7 +60,7 @@ datasets:
 
 dataset_prepared_path:
 val_set_size: 0.0
-output_dir: ./outputs/qwen_sft_${iteration_num}
+output_dir: ./outputs/qwen_sft_${iteration_num}_imend_eos
 
 sequence_len: 8192
 sample_packing: true
@@ -73,7 +73,7 @@ pad_to_sequence_len: true
 # wandb_name: qwen_test
 # wandb_log_model:
 
-gradient_accumulation_steps: 8
+gradient_accumulation_steps: $((64 / my_world_size))
 micro_batch_size: 1
 num_epochs: 1
 optimizer: paged_adamw_32bit
@@ -103,10 +103,10 @@ debug:
 weight_decay: 0.01
 fsdp:
 fsdp_config:
-# special_tokens:
-#   bos_token: "<|im_start|>"
-#   eos_token: "<|im_end|>"
-#   pad_token: "<|endoftext|>"
+special_tokens:
+  bos_token: "<|im_start|>"
+  eos_token: "<|im_end|>"
+  pad_token: "<|endoftext|>"
 
 
 plugins:

@@ -45,7 +45,7 @@ def timeout(seconds, error_message='函数执行超时'):
         return wrapper
     return decorator
 
-@timeout(10)
+@timeout(30)
 def check_correct(output, answer, idx, threshold=-1.0, accept_rates=None):
     if reward_labeling.is_equal(output, answer, dataset_name='math500'):
         reward = 1.0

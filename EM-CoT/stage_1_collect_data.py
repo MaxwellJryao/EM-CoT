@@ -167,7 +167,10 @@ for i, item in enumerate(tqdm(ds, desc='Collecting data stage 1, index {}'.forma
     for j in range(script_args.stage_1_samples):
         # correct = reward_labeling.is_equal(outputs[i].outputs[j].text, item['answer'], dataset_name='math500')
         # correct = reward_labeling.is_equal(stage_1_outputs[i][j], item['answer'], dataset_name='math500')
-        correct = utils.check_correct(stage_1_outputs[i][j], item['answer'], i, threshold=script_args.correct_threshold)
+        try:
+            correct = utils.check_correct(stage_1_outputs[i][j], item['answer'], i, threshold=script_args.correct_threshold)
+        except utils.TimeoutError as e:
+            correct = False
         if correct:
             problem_corrects.append(j)
             # collected_data['outputs'].append(outputs[i].outputs[j].text)

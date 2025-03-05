@@ -190,7 +190,7 @@ with open(f'data/data_{script_args.iter}/stage_2_allOutputs_{script_args.local_i
 #     all_outputs = json.load(f)
 # stage_2_outputs = []
 # for i in range(len(sample_sizes)):
-#     stage_2_outputs.append([all_outputs[i][j] for j in range(sample_sizes[i])])
+#     stage_2_outputs.append([all_outputs[i][j] for j in range(sample_sizes[i]-script_args.stage_1_samples)])
 
 with open(f'data/data_{script_args.iter}/stage_1_collected_data_all_{script_args.local_index}.json', 'r') as f:
     stage_1_collected_data_all = json.load(f)
@@ -212,7 +212,10 @@ for i, item in enumerate(tqdm(ds, desc='Collecting stage 2 samples')):
     for j in range(len(stage_2_outputs[i])):
         # correct = reward_labeling.is_equal(outputs[i].outputs[j].text, item['answer'], dataset_name='math500')
         # correct = reward_labeling.is_equal(stage_2_outputs[i][j], item['answer'], dataset_name='math500')
-        correct = utils.check_correct(stage_2_outputs[i][j], item['answer'], i, threshold=script_args.correct_threshold)
+        try:
+            correct = utils.check_correct(stage_2_outputs[i][j], item['answer'], i, threshold=script_args.correct_threshold)
+        except utils.TimeoutError as e:
+            correct = False
         if correct:
             problem_corrects.append(j)
             # collected_data['outputs'].append(outputs[i].outputs[j].text)
