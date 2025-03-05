@@ -6,7 +6,7 @@ eval "$(conda shell.bash hook)"
 export TOKENIZERS_PARALLELISM=false
 
 initial_model="Qwen/Qwen2.5-Math-7B"
-GPUS=(5)
+GPUS=(1 2 3 5 6 7 8 9)
 my_world_size=${#GPUS[@]}
 
 run_iteration() {
@@ -23,13 +23,13 @@ run_iteration() {
     wait
 
     for i in $(seq 0 $((my_world_size - 1))); do
-        CUDA_VISIBLE_DEVICES=${GPUS[$i]} python stage_2_calc_sample_size.py --local_index $i --iter $iteration_num --model_name_or_path=model_name_or_path &
+        CUDA_VISIBLE_DEVICES=${GPUS[$i]} python stage_2_calc_sample_size.py --local_index $i --iter $iteration_num --model_name_or_path=$model_name_or_path &
     done
 
     wait
 
     for i in $(seq 0 $((my_world_size - 1))); do
-        CUDA_VISIBLE_DEVICES=${GPUS[$i]} python stage_2_sample.py --local_index 3 --iter $iteration_num --model_name_or_path=$model_name_or_path &
+        CUDA_VISIBLE_DEVICES=${GPUS[$i]} python stage_2_sample.py --local_index $i --iter $iteration_num --model_name_or_path=$model_name_or_path &
     done
 
     wait
@@ -122,7 +122,7 @@ EOT
         --deepspeed configs/deepspeed_stage3.json
 }
 
-for i in {3..3}
+for i in {2..2}
 do
     mkdir -p data/data_${i}
 
