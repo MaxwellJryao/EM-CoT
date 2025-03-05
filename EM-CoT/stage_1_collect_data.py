@@ -123,7 +123,9 @@ def stage_1_sampling():
         conv_chat = tokenizer.apply_chat_template(conv, tokenize=False, add_generation_prompt=True)
         prompts.append(conv_chat)
     outputs = llm.generate(prompts, sampling_params)
-    return outputs
+
+    new_outputs = [[output.text for output in outputs[i].outputs] for i in range(len(outputs))]
+    return new_outputs
 
 stage_1_outputs = stage_1_sampling()
 
@@ -139,11 +141,20 @@ for i, item in enumerate(tqdm(ds, desc='Collecting data stage 1, index {}'.forma
         'outputs': []
     }
     for j in range(script_args.stage_1_samples):
-        collected_data_all['outputs'].append(stage_1_outputs[i].outputs[j].text)
+        collected_data_all['outputs'].append(stage_1_outputs[i][j])
     stage_1_collected_data_all.append(collected_data_all)
 
 with open(f'data/data_{script_args.iter}/stage_1_collected_data_all_{script_args.local_index}.json', 'w', encoding='utf-8') as f:
     json.dump(stage_1_collected_data_all, f, indent=4, ensure_ascii=False)
+
+# corrects = []
+# stage_1_collected_data = []
+# with open(f'data/data_{script_args.iter}/stage_1_collected_data_all_{script_args.local_index}.json', 'r') as f:
+#     stage_1_collected_data_all = json.load(f)
+# stage_1_outputs = []
+# for item in stage_1_collected_data_all:
+#     stage_1_outputs.append(item['outputs'])
+
 
 for i, item in enumerate(tqdm(ds, desc='Collecting data stage 1, index {}'.format(script_args.local_index))):
     collected_data = {
@@ -155,12 +166,12 @@ for i, item in enumerate(tqdm(ds, desc='Collecting data stage 1, index {}'.forma
     problem_corrects = []
     for j in range(script_args.stage_1_samples):
         # correct = reward_labeling.is_equal(outputs[i].outputs[j].text, item['answer'], dataset_name='math500')
-        # correct = reward_labeling.is_equal(stage_1_outputs[i].outputs[j].text, item['answer'], dataset_name='math500')
-        correct = utils.check_correct(stage_1_outputs[i].outputs[j].text, item['answer'], i, threshold=script_args.correct_threshold)
+        # correct = reward_labeling.is_equal(stage_1_outputs[i][j], item['answer'], dataset_name='math500')
+        correct = utils.check_correct(stage_1_outputs[i][j], item['answer'], i, threshold=script_args.correct_threshold)
         if correct:
             problem_corrects.append(j)
             # collected_data['outputs'].append(outputs[i].outputs[j].text)
-            collected_data['outputs'].append(stage_1_outputs[i].outputs[j].text)
+            collected_data['outputs'].append(stage_1_outputs[i][j])
     corrects.append(problem_corrects)
     stage_1_collected_data.append(collected_data)
 
