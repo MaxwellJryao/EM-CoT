@@ -72,6 +72,11 @@ class ScriptArguments:
         default=1,
         metadata={"help": "the iteration index"}
     )
+    act_params: Optional[str] = field(
+        default="lm_head",
+        metadata={"help": "the parameters to be activated"}
+    )
+
 
 # script_args = ScriptArguments()
 parser = HfArgumentParser(ScriptArguments)
@@ -128,7 +133,7 @@ def find_prompt_end(input_ids):
 model = AutoModelForCausalLM.from_pretrained(script_args.model_name_or_path, torch_dtype=torch.bfloat16)
 #TODO: currently only use the gradients of lm_head for gradient calculation
 for n, p in model.named_parameters():
-    if 'lm_head' not in n:
+    if script_args.act_params not in n:
         p.requires_grad = False
 params = [p for p in model.parameters() if p.requires_grad]
 # model.to(torch.device('cuda:8'))

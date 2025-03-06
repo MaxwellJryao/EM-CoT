@@ -9,7 +9,10 @@ parser.add_argument('--end', type=int, default=100)
 parser.add_argument('--iter', type=int, default=1)
 args = parser.parse_args()
 
-ds = load_dataset('json', data_files=args.data_path)['train']
+try:
+    ds = load_dataset('json', data_files=args.data_path)['train']
+except:
+    ds = load_dataset(args.data_path)['train']
 new_ds = []
 
 for i, item in enumerate(ds):
