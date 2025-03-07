@@ -60,9 +60,9 @@ class ScriptArguments:
         default=8,
         metadata={"help": "Number of samples for stage 1 per example"}
     )
-    stage_2_samples: Optional[int] = field(
-        default=8,
-        metadata={"help": "Number of samples for stage 2 per example"}
+    stage_2_samples_max: Optional[int] = field(
+        default=24,
+        metadata={"help": "Max number of samples for stage 2 per example"}
     )
     local_index: Optional[int] = field(
         default=1,
@@ -76,6 +76,10 @@ class ScriptArguments:
         default=0.0,
         metadata={"help": "the threshold for correctness"}
     )
+    model_prefix: Optional[str] = field(
+        default='Qwen7B',
+        metadata={"help": "the model prefix"}
+    )
 
 # script_args = ScriptArguments()
 parser = HfArgumentParser(ScriptArguments)
@@ -84,14 +88,14 @@ script_args = parser.parse_args_into_dataclasses()[0]
 utils.set_seed(script_args.seed)
 
 # ds = load_dataset('HuggingFaceH4/MATH-500')['test']
-with open(f'data/data_{script_args.iter}/stage_1_collected_data_{script_args.local_index}.json', 'r') as f:
+with open(f'data/{script_args.model_prefix}/data_{script_args.iter}/stage_1_collected_data_{script_args.local_index}.json', 'r') as f:
     ds = json.load(f)
 
 ds = Dataset.from_list(ds)
 
-with open(f'/scratch/jiarui14/EM-CoT/EM-CoT/data/data_{script_args.iter}/sample_sizes_{script_args.local_index}.json', 'r') as f:
+with open(f'/scratch/jiarui14/EM-CoT/EM-CoT/data/{script_args.model_prefix}/data_{script_args.iter}/sample_sizes_{script_args.local_index}.json', 'r') as f:
     sample_sizes = json.load(f)
-with open(f'/scratch/jiarui14/EM-CoT/EM-CoT/data/data_{script_args.iter}/accept_rates_{script_args.local_index}.json', 'r') as f:
+with open(f'/scratch/jiarui14/EM-CoT/EM-CoT/data/{script_args.model_prefix}/data_{script_args.iter}/accept_rates_{script_args.local_index}.json', 'r') as f:
     accept_rates = json.load(f)
 
 script_args.end = min(script_args.end, len(ds))
@@ -99,6 +103,7 @@ sample_sizes = sample_sizes[script_args.start:script_args.end]
 accept_rates = accept_rates[script_args.start:script_args.end]
 
 max_sample_size = max(sample_sizes)
+max_sample_size = min(max_sample_size, script_args.stage_2_samples_max)
 print('Max sample size:', max_sample_size)
 
 script_args.end = min(len(ds), script_args.end)
@@ -183,16 +188,16 @@ def stage_2_sampling(sample_sizes):
 
 stage_2_outputs, all_outputs = stage_2_sampling_max(sample_sizes)
 
-with open(f'data/data_{script_args.iter}/stage_2_allOutputs_{script_args.local_index}.json', 'w', encoding='utf-8') as f:
+with open(f'data/{script_args.model_prefix}/data_{script_args.iter}/stage_2_allOutputs_{script_args.local_index}.json', 'w', encoding='utf-8') as f:
     json.dump(all_outputs, f, indent=4, ensure_ascii=False)
 
-# with open(f'data/data_{script_args.iter}/stage_2_allOutputs_{script_args.local_index}.json', 'r', encoding='utf-8') as f:
+# with open(f'data/{script_args.model_prefix}/data_{script_args.iter}/stage_2_allOutputs_{script_args.local_index}.json', 'r', encoding='utf-8') as f:
 #     all_outputs = json.load(f)
 # stage_2_outputs = []
 # for i in range(len(sample_sizes)):
 #     stage_2_outputs.append([all_outputs[i][j] for j in range(sample_sizes[i]-script_args.stage_1_samples)])
 
-with open(f'data/data_{script_args.iter}/stage_1_collected_data_all_{script_args.local_index}.json', 'r') as f:
+with open(f'data/{script_args.model_prefix}/data_{script_args.iter}/stage_1_collected_data_all_{script_args.local_index}.json', 'r') as f:
     stage_1_collected_data_all = json.load(f)
 
 for i in range(len(stage_2_outputs)):
@@ -227,7 +232,7 @@ for i, item in enumerate(tqdm(ds, desc='Collecting stage 2 samples')):
 print('Total collected samples:', total_samples)
 # stage_2_collected_data_ds = Dataset.from_list(stage_2_collected_data)
 # stage_2_collected_data_ds.save_to_disk('data/stage_2_collected_data')
-with open(f'data/data_{script_args.iter}/stage_2_collected_data_{script_args.local_index}.json', 'w', encoding='utf-8') as f:
+with open(f'data/{script_args.model_prefix}/data_{script_args.iter}/stage_2_collected_data_{script_args.local_index}.json', 'w', encoding='utf-8') as f:
     json.dump(stage_2_collected_data, f, indent=4, ensure_ascii=False)
 
 print('done!')

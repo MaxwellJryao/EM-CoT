@@ -76,6 +76,10 @@ class ScriptArguments:
         default="lm_head",
         metadata={"help": "the parameters to be activated"}
     )
+    model_prefix: Optional[str] = field(
+        default="Qwen7B",
+        metadata={"help": "the prefix of the model"}
+    )
 
 
 # script_args = ScriptArguments()
@@ -85,7 +89,7 @@ script_args = parser.parse_args_into_dataclasses()[0]
 utils.set_seed(script_args.seed)
 
 # stage_1_collected_data = load_from_disk('data/stage_1_collected_data')
-with open(f'/scratch/jiarui14/EM-CoT/EM-CoT/data/data_{script_args.iter}/stage_1_collected_data_{script_args.local_index}.json', 'r') as f:
+with open(f'/scratch/jiarui14/EM-CoT/EM-CoT/data/{script_args.model_prefix}/data_{script_args.iter}/stage_1_collected_data_{script_args.local_index}.json', 'r') as f:
     stage_1_collected_data = json.load(f)
 
 script_args.end = min(script_args.end, len(stage_1_collected_data))
@@ -183,12 +187,12 @@ def calc_grad():
 all_grads = calc_grad()
 accept_rates = calc_accept_rate()
 
-with open(f'data/data_{script_args.iter}/accept_rates_{script_args.local_index}.json', 'w') as f:
+with open(f'data/{script_args.model_prefix}/data_{script_args.iter}/accept_rates_{script_args.local_index}.json', 'w') as f:
     json.dump(accept_rates, f, indent=4)
 
 sample_sizes = calc_sample_ratio(all_grads, accept_rates)
 
-with open(f'data/data_{script_args.iter}/sample_sizes_ratio_{script_args.local_index}.json', 'w') as f:
+with open(f'data/{script_args.model_prefix}/data_{script_args.iter}/sample_sizes_ratio_{script_args.local_index}.json', 'w') as f:
     json.dump(sample_sizes, f, indent=4)
 
 def float_to_int_preserve_sum(arr, N):
@@ -212,7 +216,7 @@ def float_to_int_preserve_sum(arr, N):
 
 sample_sizes = float_to_int_preserve_sum(sample_sizes, script_args.stage_2_samples)
 
-with open(f'data/data_{script_args.iter}/sample_sizes_{script_args.local_index}.json', 'w') as f:
+with open(f'data/{script_args.model_prefix}/data_{script_args.iter}/sample_sizes_{script_args.local_index}.json', 'w') as f:
     json.dump(sample_sizes, f, indent=4)
 
 # print('Sample sizes:', sample_sizes)

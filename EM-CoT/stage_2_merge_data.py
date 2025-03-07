@@ -22,13 +22,17 @@ class ScriptArguments:
         default=1,
         metadata={"help": "the iteration of the experiment"}
     )
+    model_prefix: Optional[str] = field(
+        default='Qwen7B',
+        metadata={"help": "the model prefix"}
+    )
 
 parser = HfArgumentParser(ScriptArguments)
 script_args = parser.parse_args_into_dataclasses()[0]
 
 all_data = []
 for index in range(script_args.num_collect_files):
-    with open(f'data/data_{script_args.iter}/stage_2_collected_data_{index}.json', 'r') as f:
+    with open(f'data/{script_args.model_prefix}/data_{script_args.iter}/stage_2_collected_data_{index}.json', 'r') as f:
         data = json.load(f)
     all_data.extend(data)
 
@@ -61,4 +65,4 @@ ds = ds.map(
 )
 
 ds = ds.shuffle(seed=script_args.seed).select(range(script_args.train_size))
-ds.save_to_disk(f'data/data_{script_args.iter}/train_data')
+ds.save_to_disk(f'data/{script_args.model_prefix}/data_{script_args.iter}/train_data')

@@ -86,6 +86,10 @@ class ScriptArguments:
         default=-1.0,
         metadata={"help": "the correct threshold"},
     )
+    model_prefix: Optional[str] = field(
+        default='Qwen7B',
+        metadata={"help": "the model prefix"},
+    )
 
 # script_args = ScriptArguments()
 parser = HfArgumentParser(ScriptArguments)
@@ -144,12 +148,12 @@ for i, item in enumerate(tqdm(ds, desc='Collecting data stage 1, index {}'.forma
         collected_data_all['outputs'].append(stage_1_outputs[i][j])
     stage_1_collected_data_all.append(collected_data_all)
 
-with open(f'data/data_{script_args.iter}/stage_1_collected_data_all_{script_args.local_index}.json', 'w', encoding='utf-8') as f:
+with open(f'data/{script_args.model_prefix}/data_{script_args.iter}/stage_1_collected_data_all_{script_args.local_index}.json', 'w', encoding='utf-8') as f:
     json.dump(stage_1_collected_data_all, f, indent=4, ensure_ascii=False)
 
 # corrects = []
 # stage_1_collected_data = []
-# with open(f'data/data_{script_args.iter}/stage_1_collected_data_all_{script_args.local_index}.json', 'r') as f:
+# with open(f'data/{script_args.model_prefix}/data_{script_args.iter}/stage_1_collected_data_all_{script_args.local_index}.json', 'r') as f:
 #     stage_1_collected_data_all = json.load(f)
 # stage_1_outputs = []
 # for item in stage_1_collected_data_all:
@@ -181,5 +185,5 @@ for i, item in enumerate(tqdm(ds, desc='Collecting data stage 1, index {}'.forma
 # print(corrects)
 # stage_1_collected_data_ds = Dataset.from_list(stage_1_collected_data)
 # stage_1_collected_data_ds.save_to_disk(f'data/stage_1_collected_data_{script_args.local_index}')
-with open(f'data/data_{script_args.iter}/stage_1_collected_data_{script_args.local_index}.json', 'w', encoding='utf-8') as f:
+with open(f'data/{script_args.model_prefix}/data_{script_args.iter}/stage_1_collected_data_{script_args.local_index}.json', 'w', encoding='utf-8') as f:
     json.dump(stage_1_collected_data, f, indent=4, ensure_ascii=False)
