@@ -105,6 +105,8 @@ accept_rates = accept_rates[script_args.start:script_args.end]
 max_sample_size = max(sample_sizes)
 max_sample_size = min(max_sample_size, script_args.stage_2_samples_max)
 print('Max sample size:', max_sample_size)
+for i in range(len(sample_sizes)):
+    sample_sizes[i] = min(sample_sizes[i], max_sample_size)
 
 script_args.end = min(len(ds), script_args.end)
 ds = ds.select(range(script_args.start, script_args.end))

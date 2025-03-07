@@ -17,6 +17,7 @@ run_iteration() {
     local iteration_num=$1
     local data_path=$2
     local model_name_or_path=$3
+    local suffix=$4
 
     conda activate vllm
     for i in $(seq 0 $((my_world_size - 1))); do
@@ -69,7 +70,7 @@ datasets:
 
 dataset_prepared_path:
 val_set_size: 0.0
-output_dir: /shared/storage-01/jiarui14/EM-CoT/EM-CoT/outputs/${model_prefix}_sft_${iteration_num}
+output_dir: /shared/storage-01/jiarui14/EM-CoT/EM-CoT/outputs/${model_prefix}_sft_${iteration_num}_${suffix}
 
 sequence_len: 8192
 sample_packing: true
@@ -112,10 +113,10 @@ debug:
 weight_decay: 0.01
 fsdp:
 fsdp_config:
-# special_tokens:
-#   bos_token: "<|im_start|>"
-#   eos_token: "<|im_end|>"
-#   pad_token: "<|endoftext|>"
+special_tokens:
+  bos_token: "<|im_start|>"
+  eos_token: "<|im_end|>"
+  pad_token: "<|endoftext|>"
 
 
 plugins:
@@ -133,18 +134,19 @@ EOT
 
 for i in {1..1}
 do
+    suffix="imend_eos"
     mkdir -p data/${model_prefix}/data_${i}
 
     if [ $i -eq 1 ]; then
         model_name_or_path=$initial_model
     else
         previoud_iteration=$((i-1))
-        model_name_or_path="/shared/storage-01/jiarui14/EM-CoT/EM-CoT/outputs/${model_prefix}_sft_${previoud_iteration}"
+        model_name_or_path="/shared/storage-01/jiarui14/EM-CoT/EM-CoT/outputs/${model_prefix}_sft_${previoud_iteration}_${suffix}"
     fi
 
     data_path="FlippyDora/raft${i}_train_numia_prompt_0-10000"
 
-    run_iteration $i $data_path $model_name_or_path
+    run_iteration $i $data_path $model_name_or_path $suffix
 done
 
 
