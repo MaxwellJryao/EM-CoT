@@ -141,10 +141,13 @@ def prepare_data():
             # no rejected
             continue
         chosen = item['outputs'][0]
+        rejected = None
         for sample in all_data[i]:
             if sample not in item['outputs']:
                 rejected = sample
                 break
+        if rejected is None:
+            continue
         pos.append(chosen + script_args.eot_token)
         neg.append(rejected + script_args.eot_token)
         prompts.append(item['problem'])
