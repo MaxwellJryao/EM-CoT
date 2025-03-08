@@ -64,5 +64,6 @@ ds = ds.map(
     remove_columns=remove_columns
 )
 
+script_args.train_size = min(script_args.train_size, len(ds))
 ds = ds.shuffle(seed=script_args.seed).select(range(script_args.train_size))
 ds.save_to_disk(f'data/{script_args.model_prefix}/data_{script_args.iter}/train_data')
