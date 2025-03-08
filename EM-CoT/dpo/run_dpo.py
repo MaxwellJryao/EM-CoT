@@ -112,6 +112,7 @@ class ScriptArguments:
     num_collect_files: Optional[int] = field(default=8, metadata={"help": "the number of collected files"})
     iter: Optional[int] = field(default=1, metadata={"help": "the iteration number"})
     model_prefix: Optional[str] = field(default="Qwen7B", metadata={"help": "the model prefix"})
+    base_model: Optional[str] = field(default="Qwen/Qwen2.5-Math-7B", metadata={"help": "the base model"})
 
 
 def prepare_data():
@@ -184,7 +185,7 @@ if __name__ == "__main__":
         torch_dtype=torch.bfloat16,
         attn_implementation="flash_attention_2",
     )
-    tokenizer = AutoTokenizer.from_pretrained(model_config.model_name_or_path)
+    tokenizer = AutoTokenizer.from_pretrained(script_args.base_model)
     if script_args.eos_padding:
         tokenizer.pad_token = tokenizer.eos_token
     else:
