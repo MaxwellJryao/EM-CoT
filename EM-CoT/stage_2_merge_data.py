@@ -26,6 +26,10 @@ class ScriptArguments:
         default='Qwen7B',
         metadata={"help": "the model prefix"}
     )
+    suffix: Optional[str] = field(
+        default='',
+        metadata={"help": "the suffix"}
+    )
 
 parser = HfArgumentParser(ScriptArguments)
 script_args = parser.parse_args_into_dataclasses()[0]

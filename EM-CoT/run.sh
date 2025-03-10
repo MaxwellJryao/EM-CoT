@@ -24,7 +24,7 @@ run_iteration() {
     for i in $(seq 0 $((my_world_size - 1))); do
         CUDA_VISIBLE_DEVICES=${GPUS[$i]} python stage_1_collect_data.py --local_index $i --world_size $my_world_size \
             --model_name_or_path $model_name_or_path --iter $iteration_num --data_path $data_path \
-            --model_prefix=$model_prefix --end=$data_end &
+            --model_prefix=$model_prefix --end=$data_end --suffix=$suffix &
     done
 
     wait
@@ -32,20 +32,20 @@ run_iteration() {
     for i in $(seq 0 $((my_world_size - 1))); do
         CUDA_VISIBLE_DEVICES=${GPUS[$i]} python stage_2_calc_sample_size.py --local_index $i --iter $iteration_num \
           --model_name_or_path=$model_name_or_path --act_params=$act_params --model_prefix=$model_prefix \
-          --end=$data_end &
+          --end=$data_end --suffix=$suffix &
     done
 
     wait
 
     for i in $(seq 0 $((my_world_size - 1))); do
         CUDA_VISIBLE_DEVICES=${GPUS[$i]} python stage_2_sample.py --local_index $i --iter $iteration_num \
-          --model_name_or_path=$model_name_or_path --model_prefix=$model_prefix --end=$data_end &
+          --model_name_or_path=$model_name_or_path --model_prefix=$model_prefix --end=$data_end --suffix=$suffix &
     done
 
     wait
 
     python stage_2_merge_data.py --iter $iteration_num --num_collect_files $my_world_size --model_prefix=$model_prefix \
-      --train_size=$train_size
+      --train_size=$train_size --suffix=$suffix
 
     conda activate sft
 
@@ -133,7 +133,7 @@ EOT
         --deepspeed configs/deepspeed_stage3.json
 }
 
-for i in {2..5}
+for i in {2..2}
 do
     suffix="imend_eos_1k"
     mkdir -p data/${model_prefix}/${suffix}/data_${i}
