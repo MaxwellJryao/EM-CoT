@@ -84,11 +84,16 @@ class ScriptArguments:
         default="",
         metadata={"help": "the suffix"}
     )
+    num_collect_files: Optional[int] = field(
+        default=8,
+        metadata={"help": "Number of collected files"}
+    )
 
 
 # script_args = ScriptArguments()
 parser = HfArgumentParser(ScriptArguments)
 script_args = parser.parse_args_into_dataclasses()[0]
+script_args.stage_2_samples //= script_args.num_collect_files
 
 utils.set_seed(script_args.seed)
 
@@ -198,12 +203,14 @@ sample_sizes = calc_sample_ratio(all_grads, accept_rates)
 
 with open(f'data/{script_args.model_prefix}/{script_args.suffix}/data_{script_args.iter}/sample_sizes_ratio_{script_args.local_index}.json', 'w') as f:
     json.dump(sample_sizes, f, indent=4)
+# with open(f'data/{script_args.model_prefix}/{script_args.suffix}/data_{script_args.iter}/sample_sizes_ratio_{script_args.local_index}.json', 'r') as f:
+#     sample_sizes = json.load(f)
 
 def float_to_int_preserve_sum(arr, N):
     # 1. 初步缩放并四舍五入
     scaled_arr = np.array(arr) * N
     int_arr = np.round(scaled_arr).astype(int)
-    print(int_arr)
+    # print(int_arr)
 
     # 2. 计算误差
     error = N - np.sum(int_arr)

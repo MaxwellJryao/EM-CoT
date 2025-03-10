@@ -192,16 +192,16 @@ def stage_2_sampling(sample_sizes):
 
     return new_outputs
 
-# stage_2_outputs, all_outputs = stage_2_sampling_max(sample_sizes)
+stage_2_outputs, all_outputs = stage_2_sampling_max(sample_sizes)
 
-# with open(f'data/{script_args.model_prefix}/{script_args.suffix}/data_{script_args.iter}/stage_2_allOutputs_{script_args.local_index}.json', 'w', encoding='utf-8') as f:
-#     json.dump(all_outputs, f, indent=4, ensure_ascii=False)
+with open(f'data/{script_args.model_prefix}/{script_args.suffix}/data_{script_args.iter}/stage_2_allOutputs_{script_args.local_index}.json', 'w', encoding='utf-8') as f:
+    json.dump(all_outputs, f, indent=4, ensure_ascii=False)
 
-with open(f'data/{script_args.model_prefix}/{script_args.suffix}/data_{script_args.iter}/stage_2_allOutputs_{script_args.local_index}.json', 'r', encoding='utf-8') as f:
-    all_outputs = json.load(f)
-stage_2_outputs = []
-for i in range(len(sample_sizes)):
-    stage_2_outputs.append([all_outputs[i][j] for j in range(sample_sizes[i]-script_args.stage_1_samples)])
+# with open(f'data/{script_args.model_prefix}/{script_args.suffix}/data_{script_args.iter}/stage_2_allOutputs_{script_args.local_index}.json', 'r', encoding='utf-8') as f:
+#     all_outputs = json.load(f)
+# stage_2_outputs = []
+# for i in range(len(sample_sizes)):
+#     stage_2_outputs.append([all_outputs[i][j] for j in range(sample_sizes[i]-script_args.stage_1_samples)])
 
 with open(f'data/{script_args.model_prefix}/{script_args.suffix}/data_{script_args.iter}/stage_1_collected_data_all_{script_args.local_index}.json', 'r') as f:
     stage_1_collected_data_all = json.load(f)

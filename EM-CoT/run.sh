@@ -32,7 +32,7 @@ run_iteration() {
     for i in $(seq 0 $((my_world_size - 1))); do
         CUDA_VISIBLE_DEVICES=${GPUS[$i]} python stage_2_calc_sample_size.py --local_index $i --iter $iteration_num \
           --model_name_or_path=$model_name_or_path --act_params=$act_params --model_prefix=$model_prefix \
-          --end=$data_end --suffix=$suffix &
+          --end=$data_end --suffix=$suffix --num_collect_files=$my_world_size &
     done
 
     wait
@@ -133,7 +133,7 @@ EOT
         --deepspeed configs/deepspeed_stage3.json
 }
 
-for i in {2..2}
+for i in {4..5}
 do
     suffix="imend_eos_1k"
     mkdir -p data/${model_prefix}/${suffix}/data_${i}
