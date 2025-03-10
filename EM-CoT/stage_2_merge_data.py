@@ -32,7 +32,7 @@ script_args = parser.parse_args_into_dataclasses()[0]
 
 all_data = []
 for index in range(script_args.num_collect_files):
-    with open(f'data/{script_args.model_prefix}/data_{script_args.iter}/stage_2_collected_data_{index}.json', 'r') as f:
+    with open(f'data/{script_args.model_prefix}/{script_args.suffix}/data_{script_args.iter}/stage_2_collected_data_{index}.json', 'r') as f:
         data = json.load(f)
     all_data.extend(data)
 
@@ -66,4 +66,4 @@ ds = ds.map(
 
 script_args.train_size = min(script_args.train_size, len(ds))
 ds = ds.shuffle(seed=script_args.seed).select(range(script_args.train_size))
-ds.save_to_disk(f'data/{script_args.model_prefix}/data_{script_args.iter}/train_data')
+ds.save_to_disk(f'data/{script_args.model_prefix}/{script_args.suffix}/data_{script_args.iter}/train_data')

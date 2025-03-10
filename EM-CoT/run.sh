@@ -7,11 +7,12 @@ export TOKENIZERS_PARALLELISM=false
 
 initial_model="Qwen/Qwen2.5-Math-1.5B-Instruct"
 act_params="embed_tokens" # embed_tokens for Qwen-1.5B, lm_head for Qwen-7B
-GPUS=(0 1 2 3 4 5 6 7)
+GPUS=(0 1 2 5 6 7 8 9)
 my_world_size=${#GPUS[@]}
 model_prefix="Qwen1.5B-Inst"
 data_start=0
-data_end=5000
+data_end=1000
+train_size=1000
 
 run_iteration() {
     local iteration_num=$1
@@ -44,7 +45,7 @@ run_iteration() {
     wait
 
     python stage_2_merge_data.py --iter $iteration_num --num_collect_files $my_world_size --model_prefix=$model_prefix \
-      --train_size=$data_end
+      --train_size=$train_size
 
     conda activate sft
 
@@ -58,7 +59,7 @@ strict: false
 
 chat_template: qwen_25
 datasets:
-  - path: data/${model_prefix}/data_${iteration_num}/train_data
+  - path: data/${model_prefix}/${suffix}/data_${iteration_num}/train_data
     type: chat_template
     field_messages: conversations
     message_field_role: role
@@ -132,10 +133,10 @@ EOT
         --deepspeed configs/deepspeed_stage3.json
 }
 
-for i in {1..1}
+for i in {2..5}
 do
-    suffix="imend_eos"
-    mkdir -p data/${model_prefix}/data_${i}
+    suffix="imend_eos_1k"
+    mkdir -p data/${model_prefix}/${suffix}/data_${i}
 
     if [ $i -eq 1 ]; then
         model_name_or_path=$initial_model
