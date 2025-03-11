@@ -7,6 +7,8 @@ parser.add_argument('--data_path', type=str, default='/home/jiarui/EM-CoT/Online
 parser.add_argument('--start', type=int, default=0)
 parser.add_argument('--end', type=int, default=100)
 parser.add_argument('--iter', type=int, default=1)
+parser.add_argument('--threshold', type=float, default=0)
+parser.add_argument('--select', type=str, default='one')
 args = parser.parse_args()
 
 try:
@@ -18,16 +20,31 @@ new_ds = []
 for i, item in enumerate(ds):
     rewards = item['rewards']
     max_idx = np.argmax(rewards)
+    if rewards[max_idx] <= args.threshold:
+        continue
     problem = ds[i]['problem']
-    # assert problem in item['prompt']
-    conv = [
-        {'role': 'system', 'content': 'Please reason step by step, and put your final answer within \\boxed{{}}.'},
-        {'role': 'user', 'content': problem + f' Let\'s think step by step and output the final answer within \\boxed{{}}'},
-        {'role': 'assistant', 'content': item['responses'][max_idx]}
-    ]
-    new_ds.append({
-        'conversations': conv
-    })
+    if args.select == 'one':
+        # assert problem in item['prompt']
+        conv = [
+            {'role': 'system', 'content': 'Please reason step by step, and put your final answer within \\boxed{{}}.'},
+            {'role': 'user', 'content': problem + f' Let\'s think step by step and output the final answer within \\boxed{{}}'},
+            {'role': 'assistant', 'content': item['responses'][max_idx]}
+        ]
+        new_ds.append({
+            'conversations': conv
+        })
+    else:
+        for j in range(len(rewards)):
+            if rewards[j] > args.threshold:
+                # assert problem in item['prompt']
+                conv = [
+                    {'role': 'system', 'content': 'Please reason step by step, and put your final answer within \\boxed{{}}.'},
+                    {'role': 'user', 'content': problem + f' Let\'s think step by step and output the final answer within \\boxed{{}}'},
+                    {'role': 'assistant', 'content': item['responses'][j]}
+                ]
+                new_ds.append({
+                    'conversations': conv
+                })
 
 print('new_ds', len(new_ds))
 new_ds = Dataset.from_list(new_ds)
