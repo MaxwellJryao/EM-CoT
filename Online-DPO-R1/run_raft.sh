@@ -5,17 +5,17 @@ eval "$(conda shell.bash hook)"
 
 
 # Base paths and settings
-initial_model="Qwen/Qwen2.5-Math-1.5B-Instruct"
+initial_model="Qwen/Qwen2-Math-1.5B-Instruct"
 base_path="data/raft_numina_rule_reward"
 mkdir -p $base_path
 iteration_prefix="Train"
 best_of_k=8
-GPUS=(0 1 2 3 4 5 6 7)
+GPUS=(1 2 3 4 5 6 7 8)
 my_world_size=${#GPUS[@]}
 NUM_GPUS=$my_world_size
 dataset_start=0
-dataset_end=5000
-model_prefix="Qwen1.5B-Inst"
+dataset_end=2000
+model_prefix="Qwen2-1.5B-Inst"
 
 # Function to run a set of operations for a model iteration
 run_iteration() {
@@ -102,7 +102,7 @@ pad_to_sequence_len: true
 
 gradient_accumulation_steps: $((64 / my_world_size))
 micro_batch_size: 1
-num_epochs: 3
+num_epochs: 2
 optimizer: paged_adamw_32bit
 lr_scheduler: cosine
 learning_rate: 1e-5
@@ -130,10 +130,10 @@ debug:
 weight_decay: 0.01
 fsdp:
 fsdp_config:
-# special_tokens:
-#   bos_token: "<|im_start|>"
-#   eos_token: "<|im_end|>"
-#   pad_token: "<|endoftext|>"
+special_tokens:
+  bos_token: "<|im_start|>"
+  eos_token: "<|im_end|>"
+  pad_token: "<|endoftext|>"
 
 
 plugins:
@@ -153,9 +153,9 @@ EOT
 
 
 # Main loop for iterations
-for i in {1..1}
+for i in {2..5}
 do
-    suffix="orig_eos"
+    suffix="2k_all"
     if [ -z $suffix ]; then
         echo "No suffix"
         iteration_name="${model_prefix}_numina_raft${i}"
@@ -178,7 +178,7 @@ do
         if [ -z $suffix ]; then
             model_path="/shared/storage-01/jiarui14/EM-CoT/Online-DPO-R1/outputs/${model_prefix}_numina_raft${previous_iteration}"
         else
-            model_path="outputs/${model_prefix}_numina_raft${previous_iteration}_${suffix}"
+            model_path="/shared/storage-01/jiarui14/EM-CoT/Online-DPO-R1/outputs/${model_prefix}_numina_raft${previous_iteration}_${suffix}"
         fi
     fi
 
