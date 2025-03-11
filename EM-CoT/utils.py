@@ -47,6 +47,36 @@ def timeout(seconds, error_message='函数执行超时'):
         return wrapper
     return decorator
 
+PROMPT_TEMPLATES = {
+    "qwen-boxed": (
+        "<|im_start|>system\nYou are a helpful assistant.<|im_end|>\n"
+        "<|im_start|>user\n{input}\nPlease reason step by step, and put your final answer within \\boxed{{}}.<|im_end|>\n"
+        "<|im_start|>assistant\n",
+        "{output}",
+        "\n\n",
+    ),
+    "qwen25-math-cot": (
+        "<|im_start|>system\nPlease reason step by step, and put your final answer within \\boxed{{}}.<|im_end|>\n"
+        "<|im_start|>user\n{input} Let\'s think step by step and output the final answer within \\boxed{{}}<|im_end|>\n"
+        "<|im_start|>assistant\n",
+        "{output}",
+        "\n\n",
+    ),
+    "hendrydong-longcot": (
+        "<|im_start|>system\nPlease provide a detailed, step-by-step explanation of your reasoning. Enclose your full thought process within <think> and </think> tags. Finally, present your final answer enclosed in \\boxed{{...}}.<|im_end|>\n"
+        "<|im_start|>user\n{input} Let\'s think step by step and output the final answer within \\boxed{{}}<|im_end|>\n"
+        "<|im_start|>assistant\n",
+        "{output}",
+        "\n\n",
+    )
+}
+
+SYSTEM_PROMPTS = {
+    "qwen-boxed": "You are a helpful assistant.",
+    "qwen25-math-cot": "Please reason step by step, and put your final answer within \\boxed{{}}.",
+    "hendrydong-longcot": "Please provide a detailed, step-by-step explanation of your reasoning. Enclose your full thought process within <think> and </think> tags. Finally, present your final answer enclosed in \\boxed{{...}}."
+}
+
 @timeout(30)
 def check_correct(output, answer, idx, threshold=-1.0, accept_rates=None):
     if reward_labeling.is_equal(output, answer, dataset_name='math500'):

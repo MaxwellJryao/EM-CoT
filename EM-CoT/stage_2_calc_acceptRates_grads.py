@@ -88,6 +88,10 @@ class ScriptArguments:
         default=10,
         metadata={"help": "Number of collected files"}
     )
+    system_prompt: Optional[str] = field(
+        default='qwen25-math-cot',
+        metadata={"help": "the system prompt type"}
+    )
 
 
 # script_args = ScriptArguments()
@@ -161,7 +165,7 @@ def calc_grad_logp():
             grads = []
             for j, output in enumerate(item['outputs']):
                 conv = [
-                    {'role': 'system', 'content': 'Please reason step by step, and put your final answer within \\boxed{{}}.'},
+                    {'role': 'system', 'content': utils.SYSTEM_PROMPTS[script_args.system_prompt]},
                     {'role': 'user', 'content': item['problem'] + f' Let\'s think step by step and output the final answer within \\boxed{{}}'}
                 ]
                 conv_chat = tokenizer.apply_chat_template(conv, tokenize=False, add_generation_prompt=True)
@@ -206,7 +210,7 @@ def calc_grad_ce():
             grads = []
             for j, output in enumerate(item['outputs']):
                 conv = [
-                    {'role': 'system', 'content': 'Please reason step by step, and put your final answer within \\boxed{{}}.'},
+                    {'role': 'system', 'content': utils.SYSTEM_PROMPTS[script_args.system_prompt]},
                     {'role': 'user', 'content': item['problem'] + f' Let\'s think step by step and output the final answer within \\boxed{{}}'}
                 ]
                 conv_chat = tokenizer.apply_chat_template(conv, tokenize=False, add_generation_prompt=True)

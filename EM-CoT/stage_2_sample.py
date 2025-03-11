@@ -84,6 +84,10 @@ class ScriptArguments:
         default='',
         metadata={"help": "the suffix"}
     )
+    system_prompt: Optional[str] = field(
+        default='qwen25-math-cot',
+        metadata={"help": "the system prompt type"}
+    )
 
 # script_args = ScriptArguments()
 parser = HfArgumentParser(ScriptArguments)
@@ -124,7 +128,13 @@ def stage_2_sampling_flat(sample_sizes):
     )
     prompts = []
     for i, item in enumerate(ds):
-        conv = [{'role': 'user', 'content': item['problem'] + f' Let\'s think step by step and output the final answer within \\boxed{{}}'}]
+        if script_args.system_prompt:
+            conv = [
+                {'role': 'system', 'content': utils.SYSTEM_PROMPTS[script_args.system_prompt]},
+                {'role': 'user', 'content': item['problem'] + f' Let\'s think step by step and output the final answer within \\boxed{{}}'}
+            ]
+        else:
+            conv = [{'role': 'user', 'content': item['problem'] + f' Let\'s think step by step and output the final answer within \\boxed{{}}'}]
         conv_chat = tokenizer.apply_chat_template(conv, tokenize=False, add_generation_prompt=True)
         for _ in range(sample_sizes[i]-script_args.stage_1_samples):
             prompts.append(conv_chat)
@@ -157,7 +167,13 @@ def stage_2_sampling_max(sample_sizes):
     )
 
     for i in range(len(sample_sizes)):
-        conv = [{'role': 'user', 'content': ds[i]['problem'] + f' Let\'s think step by step and output the final answer within \\boxed{{}}'}]
+        if script_args.system_prompt:
+            conv = [
+                {'role': 'system', 'content': utils.SYSTEM_PROMPTS[script_args.system_prompt]},
+                {'role': 'user', 'content': ds[i]['problem'] + f' Let\'s think step by step and output the final answer within \\boxed{{}}'}
+            ]
+        else:
+            conv = [{'role': 'user', 'content': ds[i]['problem'] + f' Let\'s think step by step and output the final answer within \\boxed{{}}'}]
         conv_chat = tokenizer.apply_chat_template(conv, tokenize=False, add_generation_prompt=True)
         prompts.append(conv_chat)
     
@@ -181,7 +197,13 @@ def stage_2_sampling(sample_sizes):
             n=sample_sizes[i],
             # n=8,
         )
-        conv = [{'role': 'user', 'content': ds[i]['problem'] + f' Let\'s think step by step and output the final answer within \\boxed{{}}'}]
+        if script_args.system_prompt:
+            conv = [
+                {'role': 'system', 'content': utils.SYSTEM_PROMPTS[script_args.system_prompt]},
+                {'role': 'user', 'content': ds[i]['problem'] + f' Let\'s think step by step and output the final answer within \\boxed{{}}'}
+            ]
+        else:
+            conv = [{'role': 'user', 'content': ds[i]['problem'] + f' Let\'s think step by step and output the final answer within \\boxed{{}}'}]
         conv_chat = tokenizer.apply_chat_template(conv, tokenize=False, add_generation_prompt=True)
         prompts = [conv_chat]
         outputs = llm.generate(prompts, sampling_params)

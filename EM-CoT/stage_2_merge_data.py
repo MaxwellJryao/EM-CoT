@@ -3,6 +3,7 @@ import json
 from dataclasses import dataclass, field
 from typing import Optional
 from transformers import HfArgumentParser
+import utils
 
 @dataclass
 class ScriptArguments:
@@ -29,6 +30,10 @@ class ScriptArguments:
     suffix: Optional[str] = field(
         default='',
         metadata={"help": "the suffix"}
+    )
+    system_prompt: Optional[str] = field(
+        default='qwen25-math-cot',
+        metadata={"help": "the system prompt type"}
     )
 
 parser = HfArgumentParser(ScriptArguments)
@@ -60,7 +65,7 @@ remove_columns = ds.column_names
 ds = ds.map(
     lambda x: {
         "conversations": [
-            {'role': 'system', 'content': 'Please reason step by step, and put your final answer within \\boxed{{}}.'},
+            {'role': 'system', 'content': utils.SYSTEM_PROMPTS[script_args.system_prompt]},
             {'role': 'user', 'content': x['problem'] + f' Let\'s think step by step and output the final answer within \\boxed{{}}'},
             {'role': 'assistant', 'content': x['output']}
         ]

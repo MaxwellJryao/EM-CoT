@@ -5,18 +5,19 @@ eval "$(conda shell.bash hook)"
 
 export TOKENIZERS_PARALLELISM=false
 
-initial_model="Qwen/Qwen2-Math-1.5B-Instruct"
+initial_model="hendrydong/ckpt47k"
 act_params="embed_tokens" # embed_tokens for Qwen-1.5B, lm_head for Qwen-7B
-GPUS=(0 1 2 3 4 5 6 7)
+GPUS=(2 3 4 5 6 7 8 9)
 my_world_size=${#GPUS[@]}
-model_prefix="Qwen2-1.5B-Inst"
+model_prefix="hendrydong-ckpt47k"
 data_start=0
 data_end=2000
 stage_1_samples_per_prompt=8
 stage_2_samples=$((stage_1_samples_per_prompt*(data_end-data_start)))
-train_size=2000
+train_size=200000
 alpha=1e-3
 beta=2.0
+system_prompt="" # "qwen25-math-cot", "hendrydong-longcot"
 
 run_iteration() {
     local iteration_num=$1
@@ -28,7 +29,8 @@ run_iteration() {
     for i in $(seq 0 $((my_world_size - 1))); do
         CUDA_VISIBLE_DEVICES=${GPUS[$i]} python stage_1_collect_data.py --local_index $i --world_size $my_world_size \
             --model_name_or_path $model_name_or_path --iter $iteration_num --data_path $data_path \
-            --model_prefix=$model_prefix --end=$data_end --suffix=$suffix --stage_1_samples=$stage_1_samples_per_prompt &
+            --model_prefix=$model_prefix --end=$data_end --suffix=$suffix --stage_1_samples=$stage_1_samples_per_prompt \
+            --system_prompt=$system_prompt &
     done
 
     wait
@@ -36,7 +38,8 @@ run_iteration() {
     for i in $(seq 0 $((my_world_size - 1))); do
         CUDA_VISIBLE_DEVICES=${GPUS[$i]} python stage_2_calc_acceptRates_grads.py --local_index $i --iter $iteration_num \
           --model_name_or_path=$model_name_or_path --act_params=$act_params --model_prefix=$model_prefix \
-          --end=$data_end --suffix=$suffix --num_collect_files=$my_world_size --stage_1_samples=$stage_1_samples_per_prompt &
+          --end=$data_end --suffix=$suffix --num_collect_files=$my_world_size --stage_1_samples=$stage_1_samples_per_prompt \
+          --system_prompt=$system_prompt &
     done
 
     wait
@@ -46,13 +49,14 @@ run_iteration() {
 
     for i in $(seq 0 $((my_world_size - 1))); do
         CUDA_VISIBLE_DEVICES=${GPUS[$i]} python stage_2_sample.py --local_index $i --iter $iteration_num \
-          --model_name_or_path=$model_name_or_path --model_prefix=$model_prefix --end=$data_end --suffix=$suffix &
+          --model_name_or_path=$model_name_or_path --model_prefix=$model_prefix --end=$data_end --suffix=$suffix \
+          --system_prompt=$system_prompt &
     done
 
     wait
 
     python stage_2_merge_data.py --iter $iteration_num --num_collect_files $my_world_size --model_prefix=$model_prefix \
-      --train_size=$train_size --suffix=$suffix
+      --train_size=$train_size --suffix=$suffix --system_prompt=$system_prompt
 
     conda activate sft
 
@@ -140,9 +144,9 @@ EOT
         --deepspeed configs/deepspeed_stage3.json
 }
 
-for i in {2..3}
+for i in {1..1}
 do
-    suffix="stage1n${stage_1_samples_per_prompt}_${act_params}_grad_sum"
+    suffix="stage1n${stage_1_samples_per_prompt}_${act_params}_grad_sum_2k_all"
     mkdir -p data/${model_prefix}/${suffix}/data_${i}
 
     if [ $i -eq 1 ]; then

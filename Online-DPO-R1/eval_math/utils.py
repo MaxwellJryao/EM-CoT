@@ -145,6 +145,13 @@ PROMPT_TEMPLATES = {
         "{output}",
         "\n\n",
     ),
+    "hendrydong-longcot": (
+        "<|im_start|>system\nPlease provide a detailed, step-by-step explanation of your reasoning. Enclose your full thought process within <think> and </think> tags. Finally, present your final answer enclosed in \\boxed{{...}}.<|im_end|>\n"
+        "<|im_start|>user\n{input} Let\'s think step by step and output the final answer within \\boxed{{}}<|im_end|>\n"
+        "<|im_start|>assistant\n",
+        "{output}",
+        "\n\n",
+    ),
     "mathstral": (
         "{input}\nPlease reason step by step, and put your final answer within \\boxed{{}}.",
         "{output}",
