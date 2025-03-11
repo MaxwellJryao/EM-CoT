@@ -5,14 +5,18 @@ eval "$(conda shell.bash hook)"
 
 export TOKENIZERS_PARALLELISM=false
 
-initial_model="Qwen/Qwen2.5-Math-1.5B-Instruct"
+initial_model="Qwen/Qwen2-Math-1.5B-Instruct"
 act_params="embed_tokens" # embed_tokens for Qwen-1.5B, lm_head for Qwen-7B
-GPUS=(0 1 2 5 6 7 8 9)
+GPUS=(0 1 2 3 4 5 6 7)
 my_world_size=${#GPUS[@]}
-model_prefix="Qwen1.5B-Inst"
+model_prefix="Qwen2-1.5B-Inst"
 data_start=0
-data_end=1000
-train_size=1000
+data_end=2000
+stage_1_samples_per_prompt=8
+stage_2_samples=$((stage_1_samples_per_prompt*(data_end-data_start)))
+train_size=2000
+alpha=1e-3
+beta=2.0
 
 run_iteration() {
     local iteration_num=$1
@@ -24,18 +28,21 @@ run_iteration() {
     for i in $(seq 0 $((my_world_size - 1))); do
         CUDA_VISIBLE_DEVICES=${GPUS[$i]} python stage_1_collect_data.py --local_index $i --world_size $my_world_size \
             --model_name_or_path $model_name_or_path --iter $iteration_num --data_path $data_path \
-            --model_prefix=$model_prefix --end=$data_end --suffix=$suffix &
+            --model_prefix=$model_prefix --end=$data_end --suffix=$suffix --stage_1_samples=$stage_1_samples_per_prompt &
     done
 
     wait
 
     for i in $(seq 0 $((my_world_size - 1))); do
-        CUDA_VISIBLE_DEVICES=${GPUS[$i]} python stage_2_calc_sample_size.py --local_index $i --iter $iteration_num \
+        CUDA_VISIBLE_DEVICES=${GPUS[$i]} python stage_2_calc_acceptRates_grads.py --local_index $i --iter $iteration_num \
           --model_name_or_path=$model_name_or_path --act_params=$act_params --model_prefix=$model_prefix \
-          --end=$data_end --suffix=$suffix --num_collect_files=$my_world_size &
+          --end=$data_end --suffix=$suffix --num_collect_files=$my_world_size --stage_1_samples=$stage_1_samples_per_prompt &
     done
 
     wait
+
+    python stage_2_calc_sample_size.py --num_collect_files=$my_world_size --suffix=$suffix --iter=$iteration_num \
+      --model_prefix=$model_prefix --stage_2_samples=$stage_2_samples --alpha=$alpha --beta=$beta
 
     for i in $(seq 0 $((my_world_size - 1))); do
         CUDA_VISIBLE_DEVICES=${GPUS[$i]} python stage_2_sample.py --local_index $i --iter $iteration_num \
@@ -86,7 +93,7 @@ pad_to_sequence_len: true
 
 gradient_accumulation_steps: $((64 / my_world_size))
 micro_batch_size: 1
-num_epochs: 3
+num_epochs: 2
 optimizer: paged_adamw_32bit
 lr_scheduler: cosine
 learning_rate: 1e-5
@@ -129,13 +136,13 @@ liger_layer_norm: true
 liger_fused_linear_cross_entropy: true
 EOT
 
-    CUDA_VISIBLE_DEVICES=$(IFS=,; echo "${GPUS[*]}") torchrun --nproc_per_node $my_world_size --master_port 20002 -m axolotl.cli.train sft/qwen.yaml \
+    CUDA_VISIBLE_DEVICES=$(IFS=,; echo "${GPUS[*]}") torchrun --nproc_per_node 8 --master_port 20001 -m axolotl.cli.train sft/qwen.yaml \
         --deepspeed configs/deepspeed_stage3.json
 }
 
-for i in {4..5}
+for i in {2..3}
 do
-    suffix="imend_eos_1k"
+    suffix="stage1n${stage_1_samples_per_prompt}_${act_params}_grad_sum"
     mkdir -p data/${model_prefix}/${suffix}/data_${i}
 
     if [ $i -eq 1 ]; then

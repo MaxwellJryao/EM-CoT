@@ -24,57 +24,21 @@ class ScriptArguments:
         default=42,
         metadata={"help": "Random seed"}
     )
-    max_length: Optional[int] = field(
-        default=4096,
-        metadata={"help": "Max length of newly generated tokens"}
-    )
-    model_name_or_path: Optional[str] = field(
-        default='Qwen/Qwen2.5-Math-7B',
-        metadata={"help": "Model name or path"}
-    )
-    epochs: Optional[int] = field(
-        default=1,
-        metadata={"help": "Number of epochs"}
-    )
     alpha: Optional[float] = field(
-        default=0.5,
+        default=1e-3,
         metadata={"help": "Penalty weight alpha"}
     )
     beta: Optional[float] = field(
         default=2.0,
         metadata={"help": "Penalty weight beta"}
     )
-    lr: Optional[float] = field(
-        default=0.5,
-        metadata={"help": "Learning rate"}
-    )
-    start: Optional[int] = field(
-        default=0,
-        metadata={"help": "Start index"}
-    )
-    end: Optional[int] = field(
-        default=100000,
-        metadata={"help": "End index"}
-    )
-    stage_1_samples: Optional[int] = field(
-        default=8,
-        metadata={"help": "Number of samples for stage 1 per example"}
-    )
     stage_2_samples: Optional[int] = field(
         default=10000,
         metadata={"help": "Number of samples for stage 2 per example"}
     )
-    local_index: Optional[int] = field(
-        default=3,
-        metadata={"help": "the local index of the agent"}
-    )
     iter: Optional[int] = field(
         default=1,
         metadata={"help": "the iteration index"}
-    )
-    act_params: Optional[str] = field(
-        default="lm_head",
-        metadata={"help": "the parameters to be activated"}
     )
     model_prefix: Optional[str] = field(
         default="Qwen7B",
@@ -93,24 +57,8 @@ class ScriptArguments:
 # script_args = ScriptArguments()
 parser = HfArgumentParser(ScriptArguments)
 script_args = parser.parse_args_into_dataclasses()[0]
-script_args.stage_2_samples //= script_args.num_collect_files
 
 utils.set_seed(script_args.seed)
-
-# stage_1_collected_data = load_from_disk('data/stage_1_collected_data')
-with open(f'/scratch/jiarui14/EM-CoT/EM-CoT/data/{script_args.model_prefix}/{script_args.suffix}/data_{script_args.iter}/stage_1_collected_data_{script_args.local_index}.json', 'r') as f:
-    stage_1_collected_data = json.load(f)
-
-script_args.end = min(script_args.end, len(stage_1_collected_data))
-stage_1_collected_data = stage_1_collected_data[script_args.start:script_args.end]
-tokenizer = AutoTokenizer.from_pretrained(script_args.model_name_or_path)
-
-def calc_accept_rate():
-    accept_rates = []
-    for item in stage_1_collected_data:
-        accept_rate = len(item['outputs']) / script_args.stage_1_samples
-        accept_rates.append(accept_rate)
-    return accept_rates
 
 def calc_sample_ratio(Gs, ps):
     # Gs: list of gradients
@@ -126,82 +74,20 @@ def calc_sample_ratio(Gs, ps):
     sample_sizes = [sample_size / total for sample_size in sample_sizes]
     return sample_sizes
 
-def find_prompt_end(input_ids):
-    end = tokenizer('<|im_start|>assistant\n')['input_ids']
-    end_len = len(end)
-    input_len = len(input_ids)
-    for i in range(input_len - end_len):
-        found = True
-        for j in range(end_len):
-            if input_ids[i + j] != end[j]:
-                found = False
-                break
-        if found:
-            return i + end_len
-    
-    # raise ValueError('End not found')
-    return -1
-    
-# load model for gradient calculation
-model = AutoModelForCausalLM.from_pretrained(script_args.model_name_or_path, torch_dtype=torch.bfloat16)
-#TODO: currently only use the gradients of lm_head for gradient calculation
-for n, p in model.named_parameters():
-    if script_args.act_params not in n:
-        p.requires_grad = False
-params = [p for p in model.parameters() if p.requires_grad]
-# model.to(torch.device('cuda:8'))
-model.cuda()
+all_grads = []
+accept_rates = []
 
-def calc_grad():
-    all_grads = []
-    for i, item in enumerate(tqdm(stage_1_collected_data, desc='Calculating gradients, index {}'.format(script_args.local_index))):
-        if len(item['outputs']) == 0:
-            mean_grad = 0
-        else:
-            grads = []
-            for j, output in enumerate(item['outputs']):
-                conv = [
-                    {'role': 'system', 'content': 'Please reason step by step, and put your final answer within \\boxed{{}}.'},
-                    {'role': 'user', 'content': item['problem'] + f' Let\'s think step by step and output the final answer within \\boxed{{}}'}
-                ]
-                conv_chat = tokenizer.apply_chat_template(conv, tokenize=False, add_generation_prompt=True)
-                conv_chat += output
-                input_ids = tokenizer(conv_chat, return_tensors='pt').input_ids.to(model.device)
-                o = model(input_ids, output_hidden_states=True)
-                logits = o.logits
-                log_probs = nn.functional.log_softmax(logits, dim=-1)
-                resp_start = find_prompt_end(input_ids[0].tolist())
-                if resp_start == -1:
-                    grad_norm = 0
-                else:
-                    output_log_probs = log_probs[0, resp_start:]
-                    output_log_probs_sen = output_log_probs.sum(dim=0)
-                    
-                    # get the gradient by loss backpropagation
-                    loss = -output_log_probs_sen.mean() / (len(input_ids[0]) - resp_start)
-                    # loss.backward()
-                    # grad_norm = torch.norm(model.lm_head.weight.grad, p=2).item()
-                    gradients = torch.autograd.grad(loss, params, create_graph=False, retain_graph=False)[0]
-                    grad_norm = torch.norm(gradients, p=2).item()
-                grads.append(grad_norm)
-                model.zero_grad()
-                torch.cuda.empty_cache()
-
-            mean_grad = np.mean(grads)
-        all_grads.append(mean_grad)
-
-    return all_grads
-
-# calculate accept rates and sample sizes
-all_grads = calc_grad()
-accept_rates = calc_accept_rate()
-
-with open(f'data/{script_args.model_prefix}/{script_args.suffix}/data_{script_args.iter}/accept_rates_{script_args.local_index}.json', 'w') as f:
-    json.dump(accept_rates, f, indent=4)
+for index in range(script_args.num_collect_files):
+    with open(f'data/{script_args.model_prefix}/{script_args.suffix}/data_{script_args.iter}/accept_rates_{index}.json', 'r') as f:
+        accept_rate = json.load(f)
+    accept_rates.extend(accept_rate)
+    with open(f'data/{script_args.model_prefix}/{script_args.suffix}/data_{script_args.iter}/grads_{index}.json', 'r') as f:
+        grad = json.load(f)
+    all_grads.extend(grad)
 
 sample_sizes = calc_sample_ratio(all_grads, accept_rates)
 
-with open(f'data/{script_args.model_prefix}/{script_args.suffix}/data_{script_args.iter}/sample_sizes_ratio_{script_args.local_index}.json', 'w') as f:
+with open(f'data/{script_args.model_prefix}/{script_args.suffix}/data_{script_args.iter}/sample_sizes_ratio.json', 'w') as f:
     json.dump(sample_sizes, f, indent=4)
 # with open(f'data/{script_args.model_prefix}/{script_args.suffix}/data_{script_args.iter}/sample_sizes_ratio_{script_args.local_index}.json', 'r') as f:
 #     sample_sizes = json.load(f)
@@ -227,8 +113,13 @@ def float_to_int_preserve_sum(arr, N):
 
 sample_sizes = float_to_int_preserve_sum(sample_sizes, script_args.stage_2_samples)
 
-with open(f'data/{script_args.model_prefix}/{script_args.suffix}/data_{script_args.iter}/sample_sizes_{script_args.local_index}.json', 'w') as f:
+with open(f'data/{script_args.model_prefix}/{script_args.suffix}/data_{script_args.iter}/sample_sizes.json', 'w') as f:
     json.dump(sample_sizes, f, indent=4)
+
+samples_per_file = len(sample_sizes) // script_args.num_collect_files
+for index in range(script_args.num_collect_files):
+    with open(f'data/{script_args.model_prefix}/{script_args.suffix}/data_{script_args.iter}/sample_sizes_{index}.json', 'w') as f:
+        json.dump(sample_sizes[index * samples_per_file: (index + 1) * samples_per_file], f, indent=4)
 
 # print('Sample sizes:', sample_sizes)
 print('done!')

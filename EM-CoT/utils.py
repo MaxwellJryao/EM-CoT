@@ -4,6 +4,7 @@ import torch
 import signal
 from datasets import load_dataset, Dataset
 import functools
+import json
 import sys
 sys.path.append('/scratch/jiarui14/EM-CoT/Online-DPO-R1')
 import reward_labeling
@@ -63,6 +64,27 @@ def check_correct(output, answer, idx, threshold=-1.0, accept_rates=None):
         
     return False
 
+def test_vllm_flat_gen():
+    from vllm import LLM, SamplingParams
+    from transformers import AutoTokenizer
+    tokenizer = AutoTokenizer.from_pretrained('Qwen/Qwen2.5-Math-1.5B-Instruct')
+    ds = load_dataset('FlippyDora/raft1_train_numia_prompt_0-10000')['train']
+    prompts = [ds[0]['problem']] * 10
+    new_prompts = []
+    for item in prompts:
+        conv = [{'role': 'user', 'content': item + f' Let\'s think step by step and output the final answer within \\boxed{{}}'}]
+        conv_chat = tokenizer.apply_chat_template(conv, tokenize=False, add_generation_prompt=True)
+        new_prompts.append(conv_chat)
+    sampling_params = SamplingParams(
+        temperature=1.0,
+        max_tokens=4096,
+        n=1
+    )
+    llm = LLM('Qwen/Qwen2.5-Math-1.5B-Instruct')
+    outputs = llm.generate(new_prompts, sampling_params)
+    texts = [output.outputs[0].text for output in outputs]
+    return texts
+
 def sample_train_ds():
     ds = load_dataset('dsrtrain/numia_prompt')['train']
     ds = ds.shuffle(seed=7).select(range(0, 10000))
@@ -90,4 +112,7 @@ if __name__ == "__main__":
     # except TimeoutError as e:
     #     print(f"捕获超时异常: {e}")
 
-    sample_train_ds()
+    # sample_train_ds()
+    outputs = test_vllm_flat_gen()
+    with open('tmp.json', 'w') as f:
+        json.dump(outputs, f, indent=4, ensure_ascii=False)

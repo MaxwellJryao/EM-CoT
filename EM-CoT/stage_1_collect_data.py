@@ -83,7 +83,7 @@ class ScriptArguments:
         metadata={"help": "the iteration number"},
     )
     correct_threshold: Optional[float] = field(
-        default=-1.0,
+        default=0.0,
         metadata={"help": "the correct threshold"},
     )
     model_prefix: Optional[str] = field(

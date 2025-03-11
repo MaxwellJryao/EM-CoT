@@ -99,12 +99,9 @@ ds = Dataset.from_list(ds)
 
 with open(f'/scratch/jiarui14/EM-CoT/EM-CoT/data/{script_args.model_prefix}/{script_args.suffix}/data_{script_args.iter}/sample_sizes_{script_args.local_index}.json', 'r') as f:
     sample_sizes = json.load(f)
-with open(f'/scratch/jiarui14/EM-CoT/EM-CoT/data/{script_args.model_prefix}/{script_args.suffix}/data_{script_args.iter}/accept_rates_{script_args.local_index}.json', 'r') as f:
-    accept_rates = json.load(f)
 
 script_args.end = min(script_args.end, len(ds))
 sample_sizes = sample_sizes[script_args.start:script_args.end]
-accept_rates = accept_rates[script_args.start:script_args.end]
 
 max_sample_size = max(sample_sizes)
 max_sample_size = min(max_sample_size, script_args.stage_2_samples_max)
@@ -129,7 +126,7 @@ def stage_2_sampling_flat(sample_sizes):
     for i, item in enumerate(ds):
         conv = [{'role': 'user', 'content': item['problem'] + f' Let\'s think step by step and output the final answer within \\boxed{{}}'}]
         conv_chat = tokenizer.apply_chat_template(conv, tokenize=False, add_generation_prompt=True)
-        for _ in range(sample_sizes[i]):
+        for _ in range(sample_sizes[i]-script_args.stage_1_samples):
             prompts.append(conv_chat)
     outputs = llm.generate(prompts, sampling_params)
 
@@ -137,10 +134,10 @@ def stage_2_sampling_flat(sample_sizes):
     new_outputs = []
     for i in range(len(sample_sizes)):
         new_outputs.append([])
-        for idx in range(idx_sum, idx_sum + sample_sizes[i]):
+        for idx in range(idx_sum, idx_sum + (sample_sizes[i]-script_args.stage_1_samples)):
             new_outputs[-1].append(outputs[idx].outputs[0].text)
 
-        idx_sum += sample_sizes[i]
+        idx_sum += max(sample_sizes[i]-script_args.stage_1_samples, 0)
 
     return new_outputs
 
@@ -192,10 +189,16 @@ def stage_2_sampling(sample_sizes):
 
     return new_outputs
 
-stage_2_outputs, all_outputs = stage_2_sampling_max(sample_sizes)
+# use flat sampling
+stage_2_outputs = stage_2_sampling_flat(sample_sizes)
 
-with open(f'data/{script_args.model_prefix}/{script_args.suffix}/data_{script_args.iter}/stage_2_allOutputs_{script_args.local_index}.json', 'w', encoding='utf-8') as f:
-    json.dump(all_outputs, f, indent=4, ensure_ascii=False)
+#
+# use max sampling
+# stage_2_outputs, all_outputs = stage_2_sampling_max(sample_sizes)
+
+# with open(f'data/{script_args.model_prefix}/{script_args.suffix}/data_{script_args.iter}/stage_2_allOutputs_{script_args.local_index}.json', 'w', encoding='utf-8') as f:
+#     json.dump(all_outputs, f, indent=4, ensure_ascii=False)
+#
 
 # with open(f'data/{script_args.model_prefix}/{script_args.suffix}/data_{script_args.iter}/stage_2_allOutputs_{script_args.local_index}.json', 'r', encoding='utf-8') as f:
 #     all_outputs = json.load(f)
@@ -208,7 +211,7 @@ with open(f'data/{script_args.model_prefix}/{script_args.suffix}/data_{script_ar
 
 for i in range(len(stage_2_outputs)):
     stage_2_outputs[i].extend(stage_1_collected_data_all[i]['outputs'])
-    all_outputs[i].extend(stage_1_collected_data_all[i]['outputs'])
+    # all_outputs[i].extend(stage_1_collected_data_all[i]['outputs'])
 
 stage_2_collected_data = []
 corrects_2 = []
@@ -220,7 +223,7 @@ for i, item in enumerate(tqdm(ds, desc='Collecting stage 2 samples')):
         'outputs': []
     }
     problem_corrects = []
-    for j in range(len(stage_2_outputs[i])):
+    for j in range(sample_sizes[i]):
         # correct = reward_labeling.is_equal(outputs[i].outputs[j].text, item['answer'], dataset_name='math500')
         # correct = reward_labeling.is_equal(stage_2_outputs[i][j], item['answer'], dataset_name='math500')
         try:
