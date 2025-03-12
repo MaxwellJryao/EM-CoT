@@ -1,0 +1,92 @@
+"""
+Preprocess the Numia dataset to parquet format
+"""
+
+import os
+import datasets
+
+from verl.utils.hdfs_io import copy, makedirs
+import argparse
+
+from verl.utils.reward_score.math import remove_boxed, last_boxed_only_string
+
+
+def extract_solution(solution_str):
+    return remove_boxed(last_boxed_only_string(solution_str))
+
+
+if __name__ == '__main__':
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--local_dir', default='./data/numina_math')
+    parser.add_argument('--hdfs_dir', default=None)
+    parser.add_argument('--train_start', type=int, default=0)
+    parser.add_argument('--train_end', type=int, default=2000)
+    parser.add_argument('--test_start', type=int, default=0)
+    parser.add_argument('--test_end', type=int, default=300)
+    parser.add_argument('--seed', type=int, default=42)
+
+    args = parser.parse_args()
+
+    # data_source = 'RLHFlow/numia_prompt_ppo'
+    data_source = 'FlippyDora/raft1_train_numia_prompt_0-10000'
+    print(f"Loading the {data_source} dataset from huggingface...", flush=True)
+    dataset = datasets.load_dataset(data_source, trust_remote_code=True)
+
+    dataset = dataset['train'].train_test_split(test_size=0.1, seed=args.seed)
+    train_dataset = dataset['train']
+    test_dataset = dataset['test']
+    args.train_end = min(args.train_end, len(train_dataset))
+    args.test_end = min(args.test_end, len(test_dataset))
+    if args.train_end > 0:
+        train_dataset = train_dataset.shuffle(seed=args.seed).select(range(args.train_start, args.train_end))
+    if args.test_end > 0:
+        test_dataset = test_dataset.shuffle(seed=args.seed).select(range(args.test_start, args.test_end))
+
+    instruction_following = "Let's think step by step and output the final answer within \\boxed{}."
+
+    # add a row to each data item that represents a unique id
+    def make_map_fn(split):
+
+        def process_fn(example, idx):
+            question = example.pop('problem')
+
+            question = question + ' ' + instruction_following
+
+            # We set the data_source as MATH so that we can use the reward model designed for MATH dataset
+            
+            # reward_model =  example['reward_model']
+            reward_model = {
+                "style": "rule",
+                "ground_truth": example['answer']
+            }
+
+            data = {
+                "data_source": 'numina_math',
+                "prompt": [{
+                    "role": "user",
+                    "content": question
+                }],
+                "ability": "math",
+                "reward_model": reward_model,
+                "extra_info": {
+                    'split': split,
+                    'index': idx
+                }
+            }
+            return data
+
+        return process_fn
+
+    train_dataset = train_dataset.map(function=make_map_fn('train'), with_indices=True)
+    test_dataset = test_dataset.map(function=make_map_fn('test'), with_indices=True)
+    print(train_dataset[0])
+    local_dir = args.local_dir
+    hdfs_dir = args.hdfs_dir
+    train_dataset.to_parquet(os.path.join(local_dir, 'train.parquet'))
+    test_dataset.to_parquet(os.path.join(local_dir, 'test.parquet'))
+
+    if hdfs_dir is not None:
+        makedirs(hdfs_dir)
+
+        copy(src=local_dir, dst=hdfs_dir)
+                                              

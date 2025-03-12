@@ -2,6 +2,7 @@ alignment-handbook/
 axolotl/
 FastChat/
 LLaMA-Factory/
+verl/
 __pycache__/
 last_run_prepared/
 Online-DPO-R1/data/
