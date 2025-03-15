@@ -73,8 +73,8 @@ PROMPT_TEMPLATES = {
 
 SYSTEM_PROMPTS = {
     "qwen-boxed": "You are a helpful assistant.",
-    "qwen25-math-cot": "Please reason step by step, and put your final answer within \\boxed{{}}.",
-    "hendrydong-longcot": "Please provide a detailed, step-by-step explanation of your reasoning. Enclose your full thought process within <think> and </think> tags. Finally, present your final answer enclosed in \\boxed{{...}}."
+    "qwen25-math-cot": "Please reason step by step, and put your final answer within \\boxed{}.",
+    "hendrydong-longcot": "Please provide a detailed, step-by-step explanation of your reasoning. Enclose your full thought process within <think> and </think> tags. Finally, present your final answer enclosed in \\boxed{...}."
 }
 
 @timeout(30)
