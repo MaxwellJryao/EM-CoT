@@ -53,7 +53,10 @@ class DataParallelPPOActor(BasePPOActor):
         self.ulysses_sequence_parallel_size = self.config.ulysses_sequence_parallel_size
         self.use_ulysses_sp = self.ulysses_sequence_parallel_size > 1
 
-        self.compute_entropy_from_logits = torch.compile(verl_F.entropy_from_logits, dynamic=True)
+        self.compute_entropy_from_logits = (
+            torch.compile(verl_F.entropy_from_logits, dynamic=True)
+            if self.config.get('use_torch_compile', True)  #  use torch compile by default
+            else verl_F.entropy_from_logits)
 
     def _forward_micro_batch(self, micro_batch, temperature) -> Tuple[torch.Tensor, torch.Tensor]:
         """
@@ -282,29 +285,18 @@ class DataParallelPPOActor(BasePPOActor):
                     # all return: (bsz, response_length)
                     entropy, log_prob = self._forward_micro_batch(micro_batch=data, temperature=temperature)
 
-                    # import ipdb; ipdb.set_trace()
-                    # seq_logp = log_prob.sum(dim=-1) # self.actor_module.model torch.autograd.grad(-log_prob.sum(dim=-1)[0], self.actor_module.lm_head.weight, create_graph=False, retain_graph=False).shape
-                    # # params = [p for n, p in self.actor_module.named_parameters() if 'embed_tokens' in n]
-                    # params = self.actor_module.embed_tokens.weight
-                    # for i in range(seq_logp.size(0)):
-                    #     em_loss = -seq_logp[i]
-                    #     gradients = torch.autograd.grad(em_loss, params, create_graph=False, retain_graph=False)[0]
-                    #     grad_norm = torch.norm(gradients, p=2).item()
-
                     if self.config.policy_loss == 'vanilla':
                         pg_loss, pg_clipfrac, ppo_kl = core_algos.compute_policy_loss_vanilla(old_log_prob=old_log_prob,
                                                                                     log_prob=log_prob,
                                                                                     advantages=advantages,
                                                                                     eos_mask=response_mask,
                                                                                     cliprange=clip_ratio)
-                    elif self.config.policy_loss == 'ppo':
+                    elif self.config.policy_loss == 'plusplus':
                         pg_loss, pg_clipfrac, ppo_kl = core_algos.compute_policy_loss(old_log_prob=old_log_prob,
                                                                                     log_prob=log_prob,
                                                                                     advantages=advantages,
                                                                                     eos_mask=response_mask,
                                                                                     cliprange=clip_ratio)
-                    else:
-                        raise NotImplementedError(f"policy_loss={self.config.policy_loss} is not implemented")
                     # compute entropy loss from entropy
                     entropy_loss = verl_F.masked_mean(entropy, response_mask)
 

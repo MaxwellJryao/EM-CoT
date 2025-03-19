@@ -106,8 +106,6 @@ def compute_gae_advantage_return(token_level_rewards: torch.Tensor, values: torc
         advantages = verl_F.masked_whiten(advantages, eos_mask)
     return advantages, returns
 
-
-# NOTE(sgm): this implementation only consider outcome supervision, where the reward is a scalar.
 def compute_raft_outcome_advantage(token_level_rewards: torch.Tensor,
                                    eos_mask: torch.Tensor,
                                    index: torch.Tensor,
@@ -365,7 +363,6 @@ def compute_policy_loss_vanilla(old_log_prob, log_prob, advantages, eos_mask, cl
     pg_loss = verl_F.masked_mean(pg_losses, eos_mask)
     pg_clipfrac = verl_F.masked_mean(torch.gt(pg_losses2, pg_losses).float(), eos_mask)
     return pg_loss, pg_clipfrac, ppo_kl
-
 
 def compute_entropy_loss(logits, eos_mask):
     """Compute Categorical entropy loss
