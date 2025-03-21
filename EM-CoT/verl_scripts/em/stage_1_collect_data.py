@@ -23,7 +23,7 @@ class ScriptArguments:
         metadata={"help": "Random seed"}
     )
     max_length: Optional[int] = field(
-        default=4096,
+        default=3072,
         metadata={"help": "Max length of newly generated tokens"}
     )
     model_name_or_path: Optional[str] = field(
@@ -83,7 +83,7 @@ class ScriptArguments:
         metadata={"help": "the iteration number"},
     )
     correct_threshold: Optional[float] = field(
-        default=0.0,
+        default=0.5,
         metadata={"help": "the correct threshold"},
     )
     model_prefix: Optional[str] = field(
@@ -123,7 +123,7 @@ tokenizer = AutoTokenizer.from_pretrained(script_args.model_name_or_path)
 
 # prepare model for sampling
 llm = LLM(script_args.model_name_or_path, 
-        #   gpu_memory_utilization=0.4,
+        #   gpu_memory_utilization=0.6,
           dtype=torch.bfloat16)
 
 def stage_1_sampling():
@@ -189,10 +189,10 @@ for i, item in enumerate(tqdm(ds, desc='Collecting data stage 1, index {}'.forma
         # correct = reward_labeling.is_equal(outputs[i].outputs[j].text, item['answer'], dataset_name='math500')
         # correct = reward_labeling.is_equal(stage_1_outputs[i][j], item['answer'], dataset_name='math500')
         try:
-            correct = utils.check_correct(stage_1_outputs[i][j], item['answer'], i, threshold=script_args.correct_threshold)
-        except utils.TimeoutError as e:
-            correct = False
-        if correct:
+            score = utils.compute_score_math_verify(stage_1_outputs[i][j], item['answer']) # , i, threshold=script_args.correct_threshold)
+        except:
+            score = 0
+        if score > script_args.correct_threshold:
             problem_corrects.append(j)
             # collected_data['outputs'].append(outputs[i].outputs[j].text)
             collected_data['outputs'].append(stage_1_outputs[i][j])

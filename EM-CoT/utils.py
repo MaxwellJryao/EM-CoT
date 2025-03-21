@@ -5,7 +5,10 @@ import signal
 from datasets import load_dataset, Dataset
 import functools
 import json
+from transformers import AutoTokenizer
+from tqdm import tqdm
 import sys
+import time
 sys.path.append('/scratch/jiarui14/EM-CoT/Online-DPO-R1')
 import reward_labeling
 
@@ -116,17 +119,28 @@ def test_vllm_flat_gen():
     return texts
 
 def sample_train_ds():
-    ds = load_dataset('dsrtrain/numia_prompt')['train']
-    ds = ds.shuffle(seed=7).select(range(0, 10000))
-    new_ds = []
-    for i, item in enumerate(ds):
-        new_item = {
-            "problem": item['problem'],
-            "answer": item['reward_model']['ground_truth']
-        }
-        new_ds.append(new_item)
-    new_ds = Dataset.from_list(new_ds)
-    new_ds.push_to_hub('FlippyDora/raft7_train_numia_prompt_0-10000')
+    tokenizer = AutoTokenizer.from_pretrained('Qwen/Qwen2.5-Math-1.5B')
+    def able_to_extract(example):
+        if len(tokenizer.encode(example['problem'])) > 700:
+            return False
+        # if last_boxed_only_string(example["response"]):
+        #     return True
+        return True
+    all_ds = load_dataset('dsrtrain/numia_prompt')['train']
+    all_ds = all_ds.shuffle(seed=42) # .select(range(0, 10000))
+    for idx in tqdm(range(0, 15)):
+        ds = all_ds.select(range(idx * 10000, (idx + 1) * 10000))
+        ds = ds.filter(able_to_extract)
+        new_ds = []
+        for i, item in enumerate(ds):
+            new_item = {
+                "problem": item['problem'],
+                "answer": item['reward_model']['ground_truth']
+            }
+            new_ds.append(new_item)
+        new_ds = Dataset.from_list(new_ds)
+        new_ds.push_to_hub(f'ScaleML-RLHF/numina_math_{idx+1}')
+        time.sleep(2)
 
 if __name__ == "__main__":
     # 示例函数，执行时间超过超时时间
@@ -142,7 +156,7 @@ if __name__ == "__main__":
     # except TimeoutError as e:
     #     print(f"捕获超时异常: {e}")
 
-    # sample_train_ds()
-    outputs = test_vllm_flat_gen()
-    with open('tmp.json', 'w') as f:
-        json.dump(outputs, f, indent=4, ensure_ascii=False)
+    sample_train_ds()
+    # outputs = test_vllm_flat_gen()
+    # with open('tmp.json', 'w') as f:
+    #     json.dump(outputs, f, indent=4, ensure_ascii=False)
