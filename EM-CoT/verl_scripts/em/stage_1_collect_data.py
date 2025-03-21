@@ -114,7 +114,10 @@ script_args.end = min(len(ds), script_args.end)
 ds = ds.select(range(script_args.start, script_args.end))
 data_size = len(ds)
 one_num_share = data_size // script_args.world_size
-ds = ds.select(range(one_num_share * script_args.local_index, one_num_share * (script_args.local_index + 1)))
+if script_args.local_index == script_args.world_size - 1:
+    ds = ds.select(range(one_num_share * script_args.local_index, data_size))
+else:
+    ds = ds.select(range(one_num_share * script_args.local_index, one_num_share * (script_args.local_index + 1)))
 
 print(f'Local index: {script_args.local_index}, World size: {script_args.world_size}, Data size: {len(ds)}')
 print(f'Start: {one_num_share * script_args.local_index}, End: {one_num_share * (script_args.local_index + 1)}')

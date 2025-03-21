@@ -24,7 +24,6 @@ from enum import Enum
 from pprint import pprint
 from typing import Type, Dict
 from copy import deepcopy
-import json
 
 import ray
 import numpy as np
@@ -782,11 +781,6 @@ class RayPPOTrainer(object):
 
         self.global_steps = 0
 
-        # load sample sizes
-        with open(self.config.actor_rollout_ref.rollout.sample_sizes_data, 'r') as f:
-            sample_sizes = json.load(f)
-        # load sample sizes
-
         # load checkpoint before doing anything
         self._load_checkpoint()
 
@@ -808,57 +802,7 @@ class RayPPOTrainer(object):
                 metrics = {}
                 timing_raw = {}
 
-                # adjust batch according to sample sizes
-                # keys: ['input_ids', 'attention_mask', 'position_ids', 'answer', 'data_source', 'ability', 'reward_model', 'extra_info', 'raw_prompt_ids', 'index']
-                new_batch_dict = {}
-                def my_repeat(v, sample_size):
-                    if isinstance(v, torch.Tensor):
-                        new_v = []
-                        for i in range(v.shape[0]):
-                            for j in range(sample_size[i]):
-                                new_v.append(v[i])
-                        return torch.stack(new_v, dim=0)
-                    elif isinstance(v, np.ndarray):
-                        new_v = []
-                        for i in range(v.shape[0]):
-                            for j in range(sample_size[i]):
-                                new_v.append(v[i])
-                        return np.array(new_v, dtype=object)
-                    else:
-                        pass
-
-                def align_chunk(sample_size):
-                    remainder = sum(sample_size) % self.config.trainer.n_gpus_per_node
-                    if remainder == 0:
-                        return sample_size
-                    
-                    indices = np.argsort(sample_size)[::-1] # descending order
-
-                    i = 0
-                    remainder = self.config.trainer.n_gpus_per_node - remainder
-                    while remainder > 0:
-                        sample_size[indices[i]] += 1
-                        remainder -= 1
-                        i = (i + 1) % len(indices)
-
-                    return sample_size
-                
-                sample_size = [sample_sizes[idx] for idx in batch_dict['index']]
-                # print(f'sum(sample_size): {sum(sample_size)}, {sum(sample_size) % self.config.trainer.n_gpus_per_node}')
-                
-                if sum(sample_size) == 0:
-                    # skip empty batch
-                    continue
-                sample_size = align_chunk(sample_size)
-                # print(f'aligned sample_size: {sum(sample_size)}')
-
-                for k, v in batch_dict.items():
-                    new_batch_dict[k] = my_repeat(v, sample_size)
-                # adjust batch according to sample sizes
-                # import ipdb; ipdb.set_trace()
-
-                batch: DataProto = DataProto.from_single_dict(new_batch_dict)
-                # import ipdb; ipdb.set_trace()
+                batch: DataProto = DataProto.from_single_dict(batch_dict)
 
                 # pop those keys for generation
                 if 'multi_modal_inputs' in batch.non_tensor_batch.keys():
@@ -873,7 +817,6 @@ class RayPPOTrainer(object):
                     )
 
                 is_last_step = self.global_steps >= self.total_training_steps
-                # import ipdb; ipdb.set_trace()
 
                 with _timer('step', timing_raw):
                     # generate a batch
@@ -910,7 +853,6 @@ class RayPPOTrainer(object):
 
                     # compute global_valid tokens
                     batch.meta_info['global_token_num'] = torch.sum(batch.batch['attention_mask'], dim=-1).tolist()
-                    # import ipdb; ipdb.set_trace()
 
                     # recompute old_log_probs
                     with _timer('old_log_prob', timing_raw):

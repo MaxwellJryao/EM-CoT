@@ -93,7 +93,7 @@ script_args.stage_2_samples = min(script_args.stage_2_samples, len(all_grads) * 
 
 sample_sizes = calc_sample_ratio(all_grads, accept_rates)
 
-with open(f'data/{script_args.model_prefix}/{script_args.suffix}/data_{script_args.iter}/sample_sizes_ratio.json', 'w') as f:
+with open(f'data/{script_args.model_prefix}/{script_args.suffix}/data_{script_args.iter}/sample_sizes_ratio_sample{script_args.stage_1_samples}.json', 'w') as f:
     json.dump(sample_sizes, f, indent=4)
 # with open(f'data/{script_args.model_prefix}/{script_args.suffix}/data_{script_args.iter}/sample_sizes_ratio_{script_args.local_index}.json', 'r') as f:
 #     sample_sizes = json.load(f)
@@ -119,7 +119,7 @@ def float_to_int_preserve_sum(arr, N):
 
 sample_sizes = float_to_int_preserve_sum(sample_sizes, script_args.stage_2_samples)
 
-with open(f'data/{script_args.model_prefix}/{script_args.suffix}/data_{script_args.iter}/sample_sizes.json', 'w') as f:
+with open(f'data/{script_args.model_prefix}/{script_args.suffix}/data_{script_args.iter}/sample_sizes_sample{script_args.stage_1_samples}.json', 'w') as f:
     json.dump(sample_sizes, f, indent=4)
 
 # samples_per_file = len(sample_sizes) // script_args.num_collect_files
