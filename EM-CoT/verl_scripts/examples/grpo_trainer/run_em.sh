@@ -6,16 +6,17 @@ data=numina_math_em
 project_name=em-raft
 algorithm=raft
 model=Qwen2.5-Math-1.5B
-model_name_or_path=Qwen/Qwen2.5-Math-1.5B
-policy_loss=plusplus # vanilla, plusplus (importance sample + clipping)
-stage_1_samples_per_prompt=32
+model_name_or_path=ScaleML-RLHF/Qwen2.5-Math-1.5B-raft-plusplus-numina_math_em-sample1n8-sample4-iter1-step_9 # /shared/storage-01/jiarui14/EM-CoT/verl/checkpoints/verl-math-new/Qwen2.5-Math-1.5B-raft-vanilla-numina_math_flat_em_stage1n64-sample64-iter1/global_step_250/actor/huggingface # /shared/storage-01/jiarui14/EM-CoT/verl/checkpoints/verl-math/Qwen2.5-Math-1.5B-raft-vanilla-numina_math_flat_em-iter1/global_step_210/actor/huggingface
+policy_loss=plusplus # vanilla, ppo (importance sample + clipping)
+stage_1_samples_per_prompt=8
 stage_2_samples_per_prompt=4
-experiment_name=${model}-${algorithm}-${policy_loss}-${data}-sample1n${stage_1_samples_per_prompt}-sample${stage_2_samples_per_prompt}-iter1
-GPUS=(0 1 2 3 4 5 6 7)
+iter=2
+experiment_name=${model}-${algorithm}-${policy_loss}-${data}-sample1n${stage_1_samples_per_prompt}-sample${stage_2_samples_per_prompt}-iter${iter}
+GPUS=(4 5 6 7)
 my_world_size=${#GPUS[@]}
 total_epochs=1
 
-math_train_path=./data/numina_math_1/train.parquet
+math_train_path=./data/numina_math_${iter}/train.parquet
 math_test_path=./data/math500/test.parquet 
 
 train_files="['$math_train_path']"
@@ -23,6 +24,7 @@ test_files="['$math_test_path']"
 
 # run_iteration() {
 #     local start_model=$1
+mkdir -p logs/${project_name}
 
 start_model=$model_name_or_path
 CUDA_VISIBLE_DEVICES=$(IFS=,; echo "${GPUS[*]}") python3 -m verl.trainer.main_ppo \
@@ -47,9 +49,10 @@ CUDA_VISIBLE_DEVICES=$(IFS=,; echo "${GPUS[*]}") python3 -m verl.trainer.main_pp
     actor_rollout_ref.actor.policy_loss=$policy_loss \
     actor_rollout_ref.rollout.tensor_model_parallel_size=1 \
     actor_rollout_ref.rollout.name=vllm \
+    +actor_rollout_ref.rollout.use_em=True \
     actor_rollout_ref.rollout.gpu_memory_utilization=0.75 \
     actor_rollout_ref.rollout.n=1 \
-    +actor_rollout_ref.rollout.sample_sizes_data="em/data/${model}/numina_math_1_n${stage_1_samples_per_prompt}/data_1/sample_sizes_sample${stage_2_samples_per_prompt}.json" \
+    +actor_rollout_ref.rollout.sample_sizes_data="em/data/${model}/numina_math_${iter}_n${stage_1_samples_per_prompt}/data_${iter}/sample_sizes_sample${stage_2_samples_per_prompt}.json" \
     actor_rollout_ref.rollout.max_num_batched_tokens=8192 \
     actor_rollout_ref.ref.fsdp_config.param_offload=True \
     algorithm.kl_ctrl.kl_coef=0.001 \
@@ -63,7 +66,7 @@ CUDA_VISIBLE_DEVICES=$(IFS=,; echo "${GPUS[*]}") python3 -m verl.trainer.main_pp
     trainer.save_freq=5 \
     trainer.default_local_dir=checkpoints/${project_name}/${experiment_name} \
     trainer.test_freq=5 \
-    trainer.total_epochs=$total_epochs $@
+    trainer.total_epochs=$total_epochs $@ 2>&1 | tee logs/${project_name}/${experiment_name}.log
 
 # }
 
