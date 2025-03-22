@@ -1,0 +1,85 @@
+from vllm import LLM, SamplingParams
+import argparse
+import torch
+from datasets import load_dataset, Dataset, load_from_disk
+from transformers import AutoTokenizer
+import verl.utils.reward_score.math_verify as math_verify
+import numpy as np
+import pandas as pd
+import json
+import os
+
+parser = argparse.ArgumentParser()
+parser.add_argument('--model_name_or_path', type=str, default='Qwen/Qwen2.5-Math-1.5B')
+parser.add_argument('--max_length', type=int, default=3072)
+parser.add_argument('--temperature', type=float, default=1.0)
+parser.add_argument('--n', type=int, default=8)
+parser.add_argument('--data', type=str, default='amc23,aime24')
+parser.add_argument('--tensor_parallel_size', type=int, default=1)
+args = parser.parse_args()
+
+model_name = args.model_name_or_path.split('/')[-1]
+os.makedirs(f'result/{model_name}')
+
+llm = LLM(args.model_name_or_path, dtype=torch.bfloat16,
+          tensor_parallel_size=args.tensor_parallel_size)
+sampling_params = SamplingParams(
+    max_tokens=args.max_length,
+    temperature=args.temperature,
+    n=args.n
+)
+
+system_prompt = "Please reason step by step, and put your final answer within \\boxed{}."
+inst = "Let\'s think step by step and output the final answer within \\boxed{}"
+
+tokenizer = AutoTokenizer.from_pretrained(args.model_name_or_path)
+
+test_datasets = args.data.split(',')
+
+res = {}
+
+for test_dataset in test_datasets:
+    print(f"Testing on {test_dataset}")
+    ds = load_dataset('json', data_files=f'data/{test_dataset}.jsonl', split='train')
+    prompts = []
+    for item in ds:
+        conv = [
+            {'role': 'system', 'content': system_prompt},
+            {'role': 'user', 'content': item['problem'] + f' {inst}'}
+        ]
+        conv_chat = tokenizer.apply_chat_template(conv, tokenize=False, add_generation_prompt=True)
+        prompts.append(conv_chat)
+
+    outputs = llm.generate(prompts, sampling_params)
+    new_outputs = [[output.text for output in outputs[i].outputs] for i in range(len(outputs))]
+    scores = []
+    for i, item in enumerate(ds):
+        scores.append([])
+        for output in new_outputs[i]:
+            try:
+                score = math_verify.compute_score(output, str(item['answer']))
+            except:
+                score = 0.0
+            scores[-1].append(score)
+
+    # scores = [[math_verify.compute_score(output, item['answer']) for output in new_outputs[i]] for i, item in enumerate(ds)]
+    scores = np.array(scores)
+    acc = np.mean(np.max(scores, axis=1) > 0.5)
+    print(f"Accuracy: {acc}")
+    res[test_dataset] = acc
+    save_data = []
+    for i, item in enumerate(ds):
+        save_data.append({
+            'problem': item['problem'],
+            'answer': item['answer'],
+            'outputs': new_outputs[i],
+            'scores': scores[i].tolist()
+        })
+    with open(f'result/{model_name}/{test_dataset}_outputs.json', 'w', encoding='utf-8') as f:
+        json.dump(save_data, f, indent=4, ensure_ascii=False)
+
+print(res)
+df = pd.DataFrame(res.items(), columns=['dataset', 'accuracy'])
+print(df)
+df.to_csv(f'result/{model_name}/results.csv', index=False)
+
