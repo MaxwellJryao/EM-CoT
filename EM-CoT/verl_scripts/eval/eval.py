@@ -7,6 +7,7 @@ import verl.utils.reward_score.math_verify as math_verify
 import numpy as np
 import pandas as pd
 import json
+from tqdm import tqdm
 import os
 
 parser = argparse.ArgumentParser()
@@ -58,7 +59,7 @@ for test_dataset in test_datasets:
     outputs = llm.generate(prompts, sampling_params)
     new_outputs = [[output.text for output in outputs[i].outputs] for i in range(len(outputs))]
     scores = []
-    for i, item in enumerate(ds):
+    for i, item in enumerate(tqdm(ds, desc='Scoring')):
         scores.append([])
         for output in new_outputs[i]:
             try:
