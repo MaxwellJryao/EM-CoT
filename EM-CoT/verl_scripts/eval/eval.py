@@ -42,6 +42,7 @@ for test_dataset in test_datasets:
     if os.path.exists(f'result/{model_name}/{test_dataset}_outputs.json'):
         print(f"Skipping {test_dataset}")
         continue
+    this_res = {}
     print(f"Testing on {test_dataset}")
     ds = load_dataset('json', data_files=f'data/{test_dataset}.jsonl', split='train')
     prompts = []
@@ -60,7 +61,11 @@ for test_dataset in test_datasets:
         scores.append([])
         for output in new_outputs[i]:
             try:
-                score = math_verify.compute_score(output, str(item['answer']))
+                answer = item['answer']
+                if isinstance(answer, list):
+                    answer = answer[0]
+                answer = str(answer)
+                score = math_verify.compute_score(output, answer)
             except:
                 score = 0.0
             scores[-1].append(score)
@@ -70,6 +75,9 @@ for test_dataset in test_datasets:
     acc = np.mean(np.max(scores, axis=1) > 0.5)
     print(f"Accuracy: {acc}")
     res[test_dataset] = acc
+    this_res[test_dataset] = acc
+    this_df = pd.DataFrame(this_res.items(), columns=['dataset', 'accuracy']).round(4)
+    this_df.to_csv(f'result/{model_name}/{test_dataset}_results.csv', index=False)
     save_data = []
     for i, item in enumerate(ds):
         save_data.append({
@@ -80,6 +88,8 @@ for test_dataset in test_datasets:
         })
     with open(f'result/{model_name}/{test_dataset}_outputs.json', 'w', encoding='utf-8') as f:
         json.dump(save_data, f, indent=4, ensure_ascii=False)
+
+    
 
 print(res)
 df = pd.DataFrame(res.items(), columns=['dataset', 'accuracy']).round(4)
