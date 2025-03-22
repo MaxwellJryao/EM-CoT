@@ -17,12 +17,12 @@ train_size=20000000
 alpha=1e-3
 beta=2.0
 system_prompt="qwen25-math-cot" # "qwen25-math-cot", "hendrydong-longcot"
-suffix="numina_math_1_n${stage_1_samples_per_prompt}"
 
 i=1
 iteration_num=$i
 model_name_or_path=$initial_model
 data_path=ScaleML-RLHF/numina_math_${i}
+suffix="numina_math_${i}_n${stage_1_samples_per_prompt}"
 
 mkdir -p data/${model_prefix}/${suffix}/data_${i}
 
@@ -37,9 +37,9 @@ done
 wait
 
 for i in $(seq 0 $((my_world_size - 1))); do
-    CUDA_VISIBLE_DEVICES=${GPUS[$i]} python stage_2_calc_acceptRates_grads.py --local_index 4 --iter $iteration_num \
+    CUDA_VISIBLE_DEVICES=${GPUS[$i]} python stage_2_calc_acceptRates_grads.py --local_index $i --iter $iteration_num \
         --model_name_or_path=$model_name_or_path --act_params=$act_params --model_prefix=$model_prefix \
-        --end=$data_end --suffix=$suffix --num_collect_files=8 --stage_1_samples=$stage_1_samples_per_prompt \
+        --end=$data_end --suffix=$suffix --num_collect_files=$my_world_size --stage_1_samples=$stage_1_samples_per_prompt \
         --system_prompt=$system_prompt &
 done
 
