@@ -1,1 +1,2 @@
-CUDA_VISIBLE_DEVICES=1 python eval.py --model_name_or_path="Qwen/Qwen2.5-Math-1.5B-Instruct"
+CUDA_VISIBLE_DEVICES=0 python eval.py --model_name_or_path="/work/nvme/bdjz/jyao4/EM-CoT/verl/checkpoints/em-raft/Qwen2.5-Math-1.5B-raft-plusplus-numina_math_em-sample1n8-sample4-iter1/global_step_9/actor/huggingface" \
+    --model_prefix="Qwen2.5-Math-1.5B-raft-plusplus-numina_math_em-sample1n8-sample4-iter1-step9"

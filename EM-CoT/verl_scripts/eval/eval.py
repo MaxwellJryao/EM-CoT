@@ -16,9 +16,10 @@ parser.add_argument('--temperature', type=float, default=1.0)
 parser.add_argument('--n', type=int, default=8)
 parser.add_argument('--data', type=str, default='math500,minerva_math,olympiad_bench,aime24,amc23')
 parser.add_argument('--tensor_parallel_size', type=int, default=1)
+parser.add_argument('--model_prefix', type=str, default='Qwen1.5B')
 args = parser.parse_args()
 
-model_name = args.model_name_or_path.split('/')[-1]
+model_name = args.model_prefix
 os.makedirs(f'result/{model_name}', exist_ok=True)
 
 llm = LLM(args.model_name_or_path, dtype=torch.bfloat16,
