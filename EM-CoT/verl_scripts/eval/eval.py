@@ -14,12 +14,12 @@ parser.add_argument('--model_name_or_path', type=str, default='Qwen/Qwen2.5-Math
 parser.add_argument('--max_length', type=int, default=3072)
 parser.add_argument('--temperature', type=float, default=1.0)
 parser.add_argument('--n', type=int, default=8)
-parser.add_argument('--data', type=str, default='amc23,aime24')
+parser.add_argument('--data', type=str, default='math500,minerva_math,olympiad_bench,aime24,amc23')
 parser.add_argument('--tensor_parallel_size', type=int, default=1)
 args = parser.parse_args()
 
 model_name = args.model_name_or_path.split('/')[-1]
-os.makedirs(f'result/{model_name}')
+os.makedirs(f'result/{model_name}', exist_ok=True)
 
 llm = LLM(args.model_name_or_path, dtype=torch.bfloat16,
           tensor_parallel_size=args.tensor_parallel_size)
@@ -39,6 +39,9 @@ test_datasets = args.data.split(',')
 res = {}
 
 for test_dataset in test_datasets:
+    if os.path.exists(f'result/{model_name}/{test_dataset}_outputs.json'):
+        print(f"Skipping {test_dataset}")
+        continue
     print(f"Testing on {test_dataset}")
     ds = load_dataset('json', data_files=f'data/{test_dataset}.jsonl', split='train')
     prompts = []
