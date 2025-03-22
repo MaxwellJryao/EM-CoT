@@ -82,7 +82,7 @@ for test_dataset in test_datasets:
         json.dump(save_data, f, indent=4, ensure_ascii=False)
 
 print(res)
-df = pd.DataFrame(res.items(), columns=['dataset', 'accuracy'])
+df = pd.DataFrame(res.items(), columns=['dataset', 'accuracy']).round(4)
 print(df)
 df.to_csv(f'result/{model_name}/results.csv', index=False)
 
