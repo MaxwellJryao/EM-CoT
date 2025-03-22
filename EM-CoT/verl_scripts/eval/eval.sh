@@ -1,0 +1,1 @@
+CUDA_VISIBLE_DEVICES=1 python eval.py --model_name_or_path="Qwen/Qwen2.5-Math-1.5B-Instruct"
