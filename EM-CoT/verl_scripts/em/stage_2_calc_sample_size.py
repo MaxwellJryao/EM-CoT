@@ -104,7 +104,7 @@ sample_sizes = calc_sample_ratio(all_grads, accept_rates)
 if script_args.filter_threshold > 0:
     sample_sizes = [sample_sizes[i] if accept_rates[i] <= script_args.filter_threshold else 0 for i in range(len(sample_sizes))]
 if script_args.filter_insufficient > 0:
-    sample_sizes = [sample_sizes[i] if (accept_rates[i] * sample_sizes[i] >= script_args.filter_insufficient) else 0 for i in range(len(sample_sizes))]
+    sample_sizes = [sample_sizes[i] if (accept_rates[i] * sample_sizes[i] * script_args.stage_2_samples >= script_args.filter_insufficient) else 0 for i in range(len(sample_sizes))]
 
 # normalize sample sizes
 total = sum(sample_sizes)
