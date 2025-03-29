@@ -147,7 +147,7 @@ def find_prompt_end(input_ids):
     return -1
     
 # load model for gradient calculation
-model = AutoModelForCausalLM.from_pretrained(script_args.model_name_or_path, torch_dtype=torch.bfloat16)
+model = AutoModelForCausalLM.from_pretrained(script_args.model_name_or_path, torch_dtype=torch.bfloat16, attn_implementation='flash_attention_2')
 #TODO: currently only use the gradients of lm_head for gradient calculation
 for n, p in model.named_parameters():
     if script_args.act_params not in n:

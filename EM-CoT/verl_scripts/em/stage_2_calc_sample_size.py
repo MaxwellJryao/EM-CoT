@@ -56,6 +56,14 @@ class ScriptArguments:
         default=8,
         metadata={"help": "Number of collected files"}
     )
+    filter_threshold: Optional[float] = field(
+        default=0.0,
+        metadata={"help": "Filter threshold"}
+    )
+    filter_insufficient: Optional[float] = field(
+        default=0.0,
+        metadata={"help": "Filter insufficient samples"}
+    )
 
 
 # script_args = ScriptArguments()
@@ -92,6 +100,15 @@ for index in range(script_args.num_collect_files):
 script_args.stage_2_samples = min(script_args.stage_2_samples, len(all_grads) * script_args.stage_1_samples)
 
 sample_sizes = calc_sample_ratio(all_grads, accept_rates)
+
+if script_args.filter_threshold > 0:
+    sample_sizes = [sample_sizes[i] if accept_rates[i] <= script_args.filter_threshold else 0 for i in range(len(sample_sizes))]
+if script_args.filter_insufficient > 0:
+    sample_sizes = [sample_sizes[i] if (accept_rates[i] * sample_sizes[i] >= script_args.filter_insufficient) else 0 for i in range(len(sample_sizes))]
+
+# normalize sample sizes
+total = sum(sample_sizes)
+sample_sizes = [sample_size / total for sample_size in sample_sizes]
 
 with open(f'data/{script_args.model_prefix}/{script_args.suffix}/data_{script_args.iter}/sample_sizes_ratio_sample{script_args.stage_1_samples}.json', 'w') as f:
     json.dump(sample_sizes, f, indent=4)

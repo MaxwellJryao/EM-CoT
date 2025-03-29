@@ -120,7 +120,7 @@ else:
     ds = ds.select(range(one_num_share * script_args.local_index, one_num_share * (script_args.local_index + 1)))
 
 print(f'Local index: {script_args.local_index}, World size: {script_args.world_size}, Data size: {len(ds)}')
-print(f'Start: {one_num_share * script_args.local_index}, End: {one_num_share * (script_args.local_index + 1)}')
+print(f'Start: {one_num_share * script_args.local_index}, End: {one_num_share * script_args.local_index + len(ds)}')
 
 tokenizer = AutoTokenizer.from_pretrained(script_args.model_name_or_path)
 

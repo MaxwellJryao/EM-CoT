@@ -24,7 +24,8 @@ model_name = args.model_prefix
 os.makedirs(f'result/{model_name}', exist_ok=True)
 
 llm = LLM(args.model_name_or_path, dtype=torch.bfloat16,
-          tensor_parallel_size=args.tensor_parallel_size)
+          tensor_parallel_size=args.tensor_parallel_size,
+          gpu_memory_utilization=0.7)
 sampling_params = SamplingParams(
     max_tokens=args.max_length,
     temperature=args.temperature,
@@ -75,9 +76,13 @@ for test_dataset in test_datasets:
     # scores = [[math_verify.compute_score(output, item['answer']) for output in new_outputs[i]] for i, item in enumerate(ds)]
     scores = np.array(scores)
     acc = np.mean(np.max(scores, axis=1) > 0.5)
-    print(f"Accuracy: {acc}")
-    res[test_dataset] = acc
-    this_res[test_dataset] = acc
+    avg_acc = np.mean(np.mean(scores, axis=1))
+    print(f"Pass Accuracy: {acc}")
+    print(f"Average Accuracy: {avg_acc}")
+    res[f'{test_dataset}'] = avg_acc
+    this_res[f'{test_dataset}'] = avg_acc
+    # res[f'{test_dataset} avg'] = avg_acc
+    # this_res[f'{test_dataset} avg'] = avg_acc
     this_df = pd.DataFrame(this_res.items(), columns=['dataset', 'accuracy']).round(4)
     this_df.to_csv(f'result/{model_name}/{test_dataset}_results.csv', index=False)
     save_data = []
