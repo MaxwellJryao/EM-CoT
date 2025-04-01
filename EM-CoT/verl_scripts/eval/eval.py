@@ -100,6 +100,8 @@ for test_dataset in test_datasets:
 
 print(res)
 df = pd.DataFrame(res.items(), columns=['dataset', 'accuracy']).round(4)
+df['3 average'] = df.iloc[:3, 1].mean(axis=0)
+df['5 average'] = df.iloc[:5, 1].mean(axis=0)
 print(df)
 df.to_csv(f'result/{model_name}/results.csv', index=False)
 

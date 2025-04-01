@@ -2,42 +2,43 @@ set -x
 
 export VLLM_ATTENTION_BACKEND=XFORMERS
 
-data=numina_math_em
+data=numina_math_em_filter
 project_name=em-raft
 algorithm=raft
-model=Qwen2.5-Math-1.5B
+model=Llama-3.2-1B-Instruct
 policy_loss=plusplus # vanilla, ppo (importance sample + clipping)
-stage_1_samples_per_prompt=32
-stage_2_samples_per_prompt=32
-filter_threshold=0.8
-filter_insufficient=1.0
+stage_1_samples_per_prompt=8
+stage_2_samples_per_prompt=4
+filter_threshold=1.0
+filter_insufficient=0.0
 
-for i in {1..3}; do
+for i in {1..15}; do
+    iter=$i
+    experiment_name=${model}-${algorithm}-${policy_loss}-${data}-sample1n${stage_1_samples_per_prompt}-sample${stage_2_samples_per_prompt}-iter${iter}
+
     if [ $i -eq 1 ]; then
-        model_name_or_path=Qwen/Qwen2.5-Math-1.5B
+        # model_name_or_path=Qwen/Qwen2.5-Math-1.5B
+        model_name_or_path=meta-llama/Llama-3.2-1B-instruct
         # model_name_or_path=/shared/storage-01/jiarui14/EM-CoT/verl/checkpoints/em-raft/Qwen2.5-Math-1.5B-raft-plusplus-numina_math_em-sample1n8-sample4-iter$((i-1))/global_step_9/actor/huggingface
     else
-        model_name_or_path=/shared/storage-01/jiarui14/EM-CoT/verl/checkpoints/em-raft/Qwen2.5-Math-1.5B-${algorithm}-${policy_loss}-${data}-sample1n${stage_1_samples_per_prompt}-sample${stage_2_samples_per_prompt}-iter$((i-1))/global_step_72/actor/huggingface # /shared/storage-01/jiarui14/EM-CoT/verl/checkpoints/verl-math-new/Qwen2.5-Math-1.5B-raft-vanilla-numina_math_flat_em_stage1n64-sample64-iter1/global_step_250/actor/huggingface # /shared/storage-01/jiarui14/EM-CoT/verl/checkpoints/verl-math/Qwen2.5-Math-1.5B-raft-vanilla-numina_math_flat_em-iter1/global_step_210/actor/huggingface
+        model_name_or_path=/shared/storage-01/jiarui14/EM-CoT/verl/checkpoints/em-raft/${model}-${algorithm}-${policy_loss}-${data}-sample1n${stage_1_samples_per_prompt}-sample${stage_2_samples_per_prompt}-iter$((i-1))/global_step_9/actor/huggingface
     fi    
 
-    if [ $i -ne 0 ]; then
+    if [ $i -ne 10 ]; then
         cd em/
-        bash run_em.sh $model_name_or_path $i $stage_1_samples_per_prompt $stage_2_samples_per_prompt $model $filter_threshold $filter_insufficient "numina_math_${i}_n${stage_1_samples_per_prompt}"
+        bash run_em2.sh $model_name_or_path $i $stage_1_samples_per_prompt $stage_2_samples_per_prompt $model $filter_threshold $filter_insufficient "numina_math_${i}_n${stage_1_samples_per_prompt}_filter${filter_threshold}_insufficient${filter_insufficient}"
         wait
         cd ..
     fi
-
     
-    iter=$i
-    experiment_name=${model}-${algorithm}-${policy_loss}-${data}-sample1n${stage_1_samples_per_prompt}-sample${stage_2_samples_per_prompt}-iter${iter}
     GPUS=(0 1 2 3 4 5 6 7)
     my_world_size=${#GPUS[@]}
     total_epochs=1
 
     if [ $i -eq 1 ]; then
-        sample_sizes_data="em/data/${model}/numina_math_${iter}_n${stage_1_samples_per_prompt}/data_${iter}/sample_sizes_sample${stage_2_samples_per_prompt}.json"
+        sample_sizes_data="em/data/${model}/numina_math_${iter}_n${stage_1_samples_per_prompt}_filter${filter_threshold}_insufficient${filter_insufficient}/data_${iter}/sample_sizes_sample${stage_2_samples_per_prompt}.json"
     else
-        sample_sizes_data="em/data/${model}/numina_math_${iter}_n${stage_1_samples_per_prompt}/data_${iter}/sample_sizes_sample${stage_2_samples_per_prompt}.json"
+        sample_sizes_data="em/data/${model}/numina_math_${iter}_n${stage_1_samples_per_prompt}_filter${filter_threshold}_insufficient${filter_insufficient}/data_${iter}/sample_sizes_sample${stage_2_samples_per_prompt}.json"
     fi
 
     math_train_path=./data/numina_math_${iter}/train.parquet
@@ -92,7 +93,7 @@ for i in {1..3}; do
         trainer.test_freq=5 \
         trainer.total_epochs=$total_epochs $@ 2>&1 | tee logs/${project_name}/${experiment_name}.log
 
-    python scripts/model_merger.py --local_dir=checkpoints/${project_name}/${experiment_name}/global_step_72/actor
+    python scripts/model_merger.py --local_dir=checkpoints/${project_name}/${experiment_name}/global_step_9/actor
 done
 
 # }

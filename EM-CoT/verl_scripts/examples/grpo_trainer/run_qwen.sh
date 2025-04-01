@@ -2,11 +2,11 @@ set -x
 
 export VLLM_ATTENTION_BACKEND=XFORMERS
 data=numina_math
-project_name=verl-math
+project_name=em-raft
 algorithm=grpo
 model=Qwen2.5-Math-1.5B
 model_name_or_path=Qwen/Qwen2.5-Math-1.5B
-experiment_name=${model}-${algorithm}-${data}
+experiment_name=${model}-${algorithm}-${data}-n4
 GPUS=(1 2 3 4 5 6 7 8)
 my_world_size=${#GPUS[@]}
 
@@ -15,6 +15,8 @@ math_test_path=./data/math500/test.parquet
 
 train_files="['$math_train_path']"
 test_files="['$math_test_path']"
+
+mkdir -p logs/${project_name}
 
 CUDA_VISIBLE_DEVICES=$(IFS=,; echo "${GPUS[*]}") python3 -m verl.trainer.main_ppo \
     algorithm.adv_estimator=$algorithm \
@@ -39,7 +41,7 @@ CUDA_VISIBLE_DEVICES=$(IFS=,; echo "${GPUS[*]}") python3 -m verl.trainer.main_pp
     actor_rollout_ref.rollout.log_prob_micro_batch_size_per_gpu=32 \
     actor_rollout_ref.rollout.tensor_model_parallel_size=1 \
     actor_rollout_ref.rollout.name=vllm \
-    actor_rollout_ref.rollout.gpu_memory_utilization=0.9 \
+    actor_rollout_ref.rollout.gpu_memory_utilization=0.8 \
     actor_rollout_ref.rollout.n=4 \
     actor_rollout_ref.ref.log_prob_micro_batch_size_per_gpu=32 \
     actor_rollout_ref.ref.fsdp_config.param_offload=True \
@@ -54,4 +56,4 @@ CUDA_VISIBLE_DEVICES=$(IFS=,; echo "${GPUS[*]}") python3 -m verl.trainer.main_pp
     trainer.save_freq=5 \
     trainer.default_local_dir=checkpoints/${project_name}/${experiment_name} \
     trainer.test_freq=5 \
-    trainer.total_epochs=15 $@
+    trainer.total_epochs=1 $@ 2>&1 | tee logs/${project_name}/${experiment_name}.log

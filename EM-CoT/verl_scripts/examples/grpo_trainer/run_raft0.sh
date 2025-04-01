@@ -2,13 +2,14 @@ set -x
 
 export VLLM_ATTENTION_BACKEND=XFORMERS
 
-data=numina_math
-project_name=verl-math
+data=numina_math_15_all
+project_name=em-raft
 algorithm=raft
-model=Qwen2.5-Math-1.5B
-model_name_or_path=Qwen/Qwen2.5-Math-1.5B
-policy_loss=vanilla # vanilla, ppo (importance sample + clipping)
-experiment_name=${model}-${algorithm}-${policy_loss}-${data}
+model=Llama-3.2-1B-Instruct
+model_name_or_path=meta-llama/Llama-3.2-1B-instruct
+policy_loss=plusplus # vanilla, ppo (importance sample + clipping)
+experiment_name=${model}-${algorithm}-${policy_loss}-${data}-n4
+# experiment_name=${model}-${algorithm}-plusplus-${data}-n4
 GPUS=(0 1 2 3 4 5 6 7)
 my_world_size=${#GPUS[@]}
 
@@ -17,6 +18,8 @@ math_test_path=./data/math500/test.parquet
 
 train_files="['$math_train_path']"
 test_files="['$math_test_path']"
+
+mkdir -p logs/${project_name}
 
 CUDA_VISIBLE_DEVICES=$(IFS=,; echo "${GPUS[*]}") python3 -m verl.trainer.main_ppo \
     algorithm.adv_estimator=$algorithm \
@@ -32,15 +35,15 @@ CUDA_VISIBLE_DEVICES=$(IFS=,; echo "${GPUS[*]}") python3 -m verl.trainer.main_pp
     actor_rollout_ref.model.enable_gradient_checkpointing=True \
     actor_rollout_ref.actor.ppo_mini_batch_size=256 \
     actor_rollout_ref.actor.use_dynamic_bsz=True \
-    actor_rollout_ref.actor.fsdp_config.param_offload=False \
-    actor_rollout_ref.actor.fsdp_config.optimizer_offload=False \
+    actor_rollout_ref.actor.fsdp_config.param_offload=True \
+    actor_rollout_ref.actor.fsdp_config.optimizer_offload=True \
     actor_rollout_ref.actor.use_kl_loss=True \
     actor_rollout_ref.actor.kl_loss_coef=0.001 \
     actor_rollout_ref.actor.kl_loss_type=low_var_kl \
     actor_rollout_ref.actor.policy_loss=$policy_loss \
-    actor_rollout_ref.rollout.tensor_model_parallel_size=2 \
+    actor_rollout_ref.rollout.tensor_model_parallel_size=1 \
     actor_rollout_ref.rollout.name=vllm \
-    actor_rollout_ref.rollout.gpu_memory_utilization=0.9 \
+    actor_rollout_ref.rollout.gpu_memory_utilization=0.5 \
     actor_rollout_ref.rollout.n=4 \
     actor_rollout_ref.rollout.max_num_batched_tokens=8192 \
     actor_rollout_ref.ref.fsdp_config.param_offload=True \
@@ -55,5 +58,5 @@ CUDA_VISIBLE_DEVICES=$(IFS=,; echo "${GPUS[*]}") python3 -m verl.trainer.main_pp
     trainer.save_freq=5 \
     trainer.default_local_dir=checkpoints/${project_name}/${experiment_name} \
     trainer.test_freq=5 \
-    trainer.total_epochs=15 $@
+    trainer.total_epochs=1 $@ 2>&1 | tee logs/${project_name}/${experiment_name}.log
 

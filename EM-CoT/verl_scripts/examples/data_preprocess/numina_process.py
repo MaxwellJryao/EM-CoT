@@ -18,10 +18,10 @@ def extract_solution(solution_str):
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument('--local_dir', default='./data/numina_math')
+    parser.add_argument('--local_dir', default='./data/numina_math_15')
     parser.add_argument('--hdfs_dir', default=None)
     parser.add_argument('--train_start', type=int, default=0)
-    parser.add_argument('--train_end', type=int, default=10000)
+    parser.add_argument('--train_end', type=int, default=10000000)
     parser.add_argument('--test_start', type=int, default=0)
     parser.add_argument('--test_end', type=int, default=200)
     parser.add_argument('--seed', type=int, default=42)
@@ -30,20 +30,20 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
     # data_source = 'RLHFlow/numia_prompt_ppo'
-    data_source = 'FlippyDora/raft1_train_numia_prompt_0-10000'
+    data_source = 'ScaleML-RLHF/numina_math_15'
     print(f"Loading the {data_source} dataset from huggingface...", flush=True)
     dataset = datasets.load_dataset(data_source, trust_remote_code=True)
     tokenizer = AutoTokenizer.from_pretrained('Qwen/Qwen2.5-Math-1.5B')
 
-    dataset = dataset['train'].train_test_split(test_size=0.1, seed=args.seed)
+    # dataset = dataset['train'].train_test_split(test_size=0.1, seed=args.seed)
     train_dataset = dataset['train']
-    test_dataset = dataset['test']
+    # test_dataset = dataset['test']
     args.train_end = min(args.train_end, len(train_dataset))
-    args.test_end = min(args.test_end, len(test_dataset))
+    # args.test_end = min(args.test_end, len(test_dataset))
     if args.train_end > 0:
-        train_dataset = train_dataset.shuffle(seed=args.seed).select(range(args.train_start, args.train_end))
-    if args.test_end > 0:
-        test_dataset = test_dataset.shuffle(seed=args.seed).select(range(args.test_start, args.test_end))
+        train_dataset = train_dataset.select(range(args.train_start, args.train_end))
+    # if args.test_end > 0:
+    #     test_dataset = test_dataset.shuffle(seed=args.seed).select(range(args.test_start, args.test_end))
 
     instruction_following = "Let's think step by step and output the final answer within \\boxed{}."
     system_prompt = "Please reason step by step, and put your final answer within \\boxed{}."
@@ -94,24 +94,30 @@ if __name__ == '__main__':
         #     return True
         return True
 
-    train_dataset = train_dataset.filter(able_to_extract)
-    test_dataset = test_dataset.filter(able_to_extract)
+    # train_dataset = train_dataset.filter(able_to_extract)
+    # test_dataset = test_dataset.filter(able_to_extract)
     if args.flat_n > 0:
-        train_dataset = [train_dataset] * args.flat_n
+        new_ds = []
+        for item in train_dataset:
+            for _ in range(args.flat_n):
+                new_ds.append(item)
+        # train_dataset = [train_dataset] * args.flat_n
         # test_dataset = [test_dataset] * args.flat_n
-        train_dataset = datasets.concatenate_datasets(train_dataset)
+        # train_dataset = datasets.concatenate_datasets(train_dataset)
         # test_dataset = datasets.concatenate_datasets(test_dataset)
+        train_dataset = datasets.Dataset.from_list(new_ds)
     
     print(f"Train dataset size: {len(train_dataset)}")
-    print(f"Test dataset size: {len(test_dataset)}")
+    # print(f"Test dataset size: {len(test_dataset)}")
 
     train_dataset = train_dataset.map(function=make_map_fn('train'), with_indices=True)
-    test_dataset = test_dataset.map(function=make_map_fn('test'), with_indices=True)
+    # train_dataset = train_dataset.shuffle(seed=args.seed)
+    # test_dataset = test_dataset.map(function=make_map_fn('test'), with_indices=True)
     print(train_dataset[0])
     local_dir = args.local_dir
     hdfs_dir = args.hdfs_dir
     train_dataset.to_parquet(os.path.join(local_dir, 'train.parquet'))
-    test_dataset.to_parquet(os.path.join(local_dir, 'test.parquet'))
+    # test_dataset.to_parquet(os.path.join(local_dir, 'test.parquet'))
 
     if hdfs_dir is not None:
         makedirs(hdfs_dir)
