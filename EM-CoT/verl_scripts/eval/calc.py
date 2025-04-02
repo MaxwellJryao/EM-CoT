@@ -2,7 +2,9 @@ import json
 import numpy as np
 import pandas as pd
 from tqdm import tqdm
+import verl.utils.reward_score.math_verify as math_verify
 
+metric = 'majority_vote' # 'majority_vote' or 'average' or 'pass'
 ds_names = ['math500', 'minerva_math', 'olympiad_bench', 'aime24', 'amc23']
 df = pd.DataFrame(columns=ds_names)
 
@@ -11,8 +13,10 @@ for step in tqdm(range(1, 2, 1)):
     # for ds in ['math500', 'minerva_math', 'olympiad_bench']:
     step_accs = []
     for ds in ds_names:
+        rewrite = False
+        file_name = f'/shared/storage-01/jiarui14/EM-CoT/verl/eval/result/ScaleML-RLHF/Qwen2.5-Math-1.5B-grpo-plusplus-numina_math_15_all-n4-step_10-n8_t1.0/{ds}_outputs.json'
         try:
-            with open(f'/shared/storage-01/jiarui14/EM-CoT/verl/eval/result/Qwen2.5-Math-1.5B-raft-plusplus-numina_math_em-sample1n32-sample32-iter3-n8_t1.0/{ds}_outputs.json') as f:
+            with open(file_name) as f:
                 res = json.load(f)
         except:
             # with open(f'/shared/storage-01/jiarui14/EM-CoT/verl/eval/result/Qwen2.5-Math-1.5B-raft-plusplus-numina_math_15_all-n4-step{step}-n8_t1.0/{ds}_outputs.json') as f:
@@ -20,8 +24,34 @@ for step in tqdm(range(1, 2, 1)):
             continue
 
         acc = 0
-        for item in res:
-            acc += np.mean(item['scores'])
+        for i, item in enumerate(tqdm(res)):
+            if metric == 'average':
+                acc += np.mean(item['scores'])
+            elif metric == 'pass':
+                acc += 1 if np.mean(item['scores']) > 0.5 else 0
+            elif metric == 'majority_vote':
+                if 'preds' not in item:
+                    rewrite = True
+                    preds = []
+                    for output in item['outputs']:
+                        _, str_preds = math_verify.compute_score(output, item['answer'], return_preds=True)
+                        if str_preds[1]:
+                            preds.append(str_preds[1][-1])
+                    res[i]['preds'] = preds
+                votes = {}
+                for pred in item['preds']:
+                    if pred not in votes:
+                        votes[pred] = 1
+                    else:
+                        votes[pred] += 1
+                sorted_votes = sorted(votes.items(), key=lambda x: x[1], reverse=True)
+                vote_idx = item['preds'].index(sorted_votes[0][0])
+                if vote_idx >= 0:
+                    acc += 1 if item['scores'][vote_idx] > 0.5 else 0
+
+        if rewrite:
+            with open(file_name, 'w', encoding='utf-8') as f:
+                json.dump(res, f, indent=4, ensure_ascii=False)
 
         step_accs.append(acc / len(res))
 

@@ -25,7 +25,7 @@ os.makedirs(f'result/{model_name}', exist_ok=True)
 
 llm = LLM(args.model_name_or_path, dtype=torch.bfloat16,
           tensor_parallel_size=args.tensor_parallel_size,
-          gpu_memory_utilization=0.7)
+          gpu_memory_utilization=0.6)
 sampling_params = SamplingParams(
     max_tokens=args.max_length,
     temperature=args.temperature,
@@ -60,18 +60,26 @@ for test_dataset in test_datasets:
     outputs = llm.generate(prompts, sampling_params)
     new_outputs = [[output.text for output in outputs[i].outputs] for i in range(len(outputs))]
     scores = []
+    preds = []
     for i, item in enumerate(tqdm(ds, desc='Scoring')):
         scores.append([])
+        preds.append([])
         for output in new_outputs[i]:
             try:
                 answer = item['answer']
                 if isinstance(answer, list):
                     answer = answer[0]
                 answer = str(answer)
-                score = math_verify.compute_score(output, answer)
+                score, str_preds = math_verify.compute_score(output, answer, return_preds=True)
+                if str_preds[1]:
+                    str_preds = str_preds[1][-1]
+                else:
+                    str_preds = ''
             except:
                 score = 0.0
+                str_preds = ''
             scores[-1].append(score)
+            preds[-1].append(str_preds)
 
     # scores = [[math_verify.compute_score(output, item['answer']) for output in new_outputs[i]] for i, item in enumerate(ds)]
     scores = np.array(scores)
@@ -91,7 +99,8 @@ for test_dataset in test_datasets:
             'problem': item['problem'],
             'answer': item['answer'],
             'outputs': new_outputs[i],
-            'scores': scores[i].tolist()
+            'scores': scores[i].tolist(),
+            'preds': preds[i]
         })
     with open(f'result/{model_name}/{test_dataset}_outputs.json', 'w', encoding='utf-8') as f:
         json.dump(save_data, f, indent=4, ensure_ascii=False)
